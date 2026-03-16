@@ -100,7 +100,8 @@
         .share-controls { display: flex; gap: 8px; margin-left: 8px; border-left: 1px solid var(--bg-tertiary); padding-left: 12px; }
         .legend { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--bg-primary); border: 1px solid var(--bg-tertiary); border-radius: 20px; }
         .legend-label { font-size: 11px; color: var(--text-secondary); }
-        .legend-gradient { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--exposure-0), var(--exposure-2), var(--exposure-5), var(--exposure-7), var(--exposure-10)); }
+        /* 缩短色条长度，适应一行显示 */
+        .legend-gradient { width: 100px; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--exposure-0), var(--exposure-2), var(--exposure-5), var(--exposure-7), var(--exposure-10)); }
 
         .category-sidebar-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); }
         .category-sidebar-btn { padding: 4px 10px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
@@ -201,7 +202,7 @@
             
             .main-content { overflow-y: visible; flex: none; }
             .charts-grid { grid-template-columns: 1fr; }
-            .header-controls-group { flex-direction: column; align-items: flex-start; }
+            .header-controls-group { flex-direction: column; align-items: flex-start; gap: 8px; }
             .grid-viz { grid-template-columns: repeat(2, 1fr); }
             
             /* 2. 视图标签栏自动换行（双行）优化 */
@@ -225,6 +226,11 @@
             .proportion-value { width: 45px; font-size: 11px; }
             .trend-value { width: 45px; font-size: 11px; }
             .proportion-viz, .trend-viz { padding: 12px 10px; } /* 减小内边距 */
+            
+            /* 手机端进一步缩短色条，让出按钮空间 */
+            .legend-gradient { width: 60px; }
+            .legend { padding: 4px 8px; gap: 4px; }
+            .share-controls { margin-left: 0; border-left: none; padding-left: 0; flex-wrap: wrap; }
         }
 
         .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-secondary); }
@@ -344,12 +350,13 @@
                             </div>
                             
                             <div class="share-controls" id="shareControlsGroup">
-                                <!-- 新增：分享链接功能 -->
-                                <button class="sort-btn" id="shareLinkBtn" style="background: var(--bg-primary); color: var(--text-primary); border-color: var(--bg-tertiary);">
+                                <!-- 分享链接：统一调整为黑底白字 -->
+                                <button class="sort-btn" id="shareLinkBtn" style="background: var(--text-primary); color: white; border-color: var(--text-primary);">
                                     <svg style="width:14px;height:14px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                                     <span id="shareLinkText">分享链接</span>
                                 </button>
                                 
+                                <!-- 保存截图：保持黑底白字 -->
                                 <button class="sort-btn" id="shareScreenshotBtn" style="background: var(--text-primary); color: white; border-color: var(--text-primary);">
                                     <svg style="width:14px;height:14px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                                     <span id="shareBtnText">保存截图 (PNG)</span>
@@ -391,7 +398,7 @@
         <div class="screenshot-content">
             <div class="screenshot-header">
                 <h3>📸 截图已生成并触发下载</h3>
-                <span class="screenshot-header-hint">✅ 若未自动下载，请右键图片 -> 另存为</span>
+                <span class="screenshot-header-hint" id="screenshotHint">✅ 若未自动下载，请右键图片 -> 另存为</span>
                 <button class="screenshot-close-btn" id="closeModalBtn">×</button>
             </div>
             <div class="screenshot-body" id="screenshotImageContainer"></div>
@@ -557,8 +564,13 @@
 
             // 杀手锏 2 & 3: 终极防御系统设置
             function setupProtections() {
-                // 禁用右键
-                document.addEventListener('contextmenu', e => e.preventDefault());
+                // 🌟 修改点：禁用右键，但【为截图弹窗开辟特权】，让PC端可以在截图上右键另存！
+                document.addEventListener('contextmenu', e => {
+                    // 如果右键点击的不是截图弹窗里面的内容，就拦截掉
+                    if (!e.target.closest('#screenshotModal')) {
+                        e.preventDefault();
+                    }
+                });
 
                 // 拦截快捷键
                 document.addEventListener('keydown', e => {
@@ -702,11 +714,11 @@
                 
                 const titles = { 'grid': '美国职业AI冲击度分布', 'list': '美国职业AI冲击度列表', 'treemap': '美国职业树地图', 'proportion': '美国各行业职业比例', 'trend': '美国24~25年度AI冲击趋势' };
                 
-                // 🌟 将 <img> 加了回来，并且提供了完美的错误自动降级展示 SVG
+                // 🌟 修正了这里的拼写错误，从 ebaobao 修正为真实的 ebaogao-logo.png
                 document.getElementById('chartTitle').innerHTML = `
                     <span>${titles[state.currentView]}${countText}</span>
                     <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:8px; display:inline-flex; align-items:center; text-decoration:none;">
-                        <img src="ebaobao-logo.png" alt="ebaogao" style="height:26px; vertical-align:middle; object-fit:contain;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                        <img src="ebaogao-logo.png" alt="ebaogao" style="height:26px; vertical-align:middle; object-fit:contain;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
                         <svg style="display:none; height:26px; vertical-align:middle;" viewBox="0 0 110 24" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="2" width="20" height="20" rx="4" fill="#3498db"/><rect x="4" y="12" width="3" height="6" rx="1" fill="#ffffff"/><rect x="8.5" y="8" width="3" height="10" rx="1" fill="#ffffff"/><rect x="13" y="14" width="3" height="4" rx="1" fill="#ffffff"/><text x="26" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#2c3e50">ebaogao</text><text x="86" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#3498db">.cn</text></svg>
                     </a>`;
                 
@@ -961,6 +973,11 @@
                         } catch(e) {
                             console.warn('直接下载可能被拦截', e);
                         }
+
+                        // 🌟 动态判断设备，改变提示文案
+                        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                        const hintText = isMobile ? '✅ 请长按图片，转发或者保存' : '✅ 若未自动下载，请右键图片 -> 另存为';
+                        document.getElementById('screenshotHint').innerText = hintText;
 
                         // 弹窗预览双保险
                         const imgContainer = document.getElementById('screenshotImageContainer');
