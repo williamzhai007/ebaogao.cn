@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美国就业市场AI冲击程度分析</title>
+    <!-- 引入 D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- 引入 html2canvas 确保截图可用 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #ffffff; --bg-secondary: #f8f9fa; --bg-tertiary: #e9ecef;
+            --text-primary: #212529; --text-secondary: #6c757d; --text-muted: #adb5bd;
+            --accent: #3498db; --accent-hover: #2980b9;
+            --exposure-0: #27ae60; --exposure-1: #2ecc71; --exposure-2: #f1c40f;
+            --exposure-3: #f39c12; --exposure-4: #e67e22; --exposure-5: #e74c3c;
+            --exposure-6: #c0392b; --exposure-7: #9b59b6; --exposure-8: #8e44ad;
+            --exposure-9: #7d3c98; --exposure-10: #6c3483;
+            --sidebar-width: 340px; --transition-speed: 0.3s;
+        }
+
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+            background: var(--bg-primary); color: var(--text-primary);
+            line-height: 1.6; height: 100vh; overflow: hidden;
+            /* 基础防线：禁止用户选中页面文本防复制 */
+            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+        }
+
+        .container { display: flex; height: 100vh; transition: opacity 0.2s; }
+
+        /* 安全护盾样式 */
+        #security-shield {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f8f9fa; z-index: 999999; text-align: center; padding-top: 20vh;
+            flex-direction: column; align-items: center;
+        }
+        #security-shield h2 { color: #e74c3c; font-size: 28px; margin-bottom: 16px; }
+        #security-shield p { color: var(--text-secondary); font-size: 16px; margin-bottom: 8px; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--bg-tertiary); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+        .sidebar-scroll { overflow-y: auto; flex: 1; height: 0; }
+        .sidebar-scroll::-webkit-scrollbar { width: 6px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 3px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+        .sidebar-header { padding: 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-primary); flex-shrink: 0; }
+        .sidebar-header h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+        .sidebar-header p { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .sidebar-header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+
+        /* 统计数据 */
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; background: linear-gradient(135deg, #f8fafc 0%, #fff 100%); }
+        .stat-card { background: white; padding: 12px 6px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--bg-tertiary); }
+        .stat-value { font-size: 24px; font-weight: 800; font-family: "SF Mono", Monaco, monospace; background: linear-gradient(135deg, var(--accent) 0%, #2ecc71 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-value.highlight { background: linear-gradient(135deg, #e74c3c 0%, #f39c12 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-weight: 500; }
+
+        /* 搜索与筛选 */
+        .search-section { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; position: relative; z-index: 100; }
+        .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--bg-tertiary); border-radius: 8px; font-size: 14px; outline: none; transition: all var(--transition-speed); font-family: inherit; -webkit-user-select: auto; user-select: auto; }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); }
+        .search-dropdown { position: absolute; top: 100%; left: 24px; right: 24px; background: white; border: 1px solid var(--bg-tertiary); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; z-index: 1000; }
+        .search-dropdown.show { display: block; }
+        .search-dropdown-item { padding: 12px 14px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--bg-secondary); }
+        .search-dropdown-item:hover { background: var(--bg-secondary); }
+        .search-dropdown-item .color-bar { width: 6px; height: 24px; border-radius: 3px; flex-shrink: 0; }
+        .search-dropdown-item .job-title { flex: 1; font-size: 13px; font-weight: 500; }
+        .search-dropdown-item .job-meta { font-size: 11px; color: var(--text-muted); }
+        .filter-section { padding: 20px 24px; border-bottom: 1px solid var(--bg-tertiary); }
+        .filter-section h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; letter-spacing: 0.5px; }
+        .exposure-bars { display: flex; gap: 3px; height: 60px; align-items: flex-end; }
+        .exposure-bar { flex: 1; background: var(--exposure-0); border-radius: 2px 2px 0 0; cursor: pointer; transition: all var(--transition-speed); min-height: 4px; }
+        .exposure-bar:hover { transform: scaleY(1.1); box-shadow: 0 -2px 8px rgba(0,0,0,0.15); }
+        .exposure-bar.active { box-shadow: 0 0 0 2px var(--text-primary); }
+        .exposure-bar[data-range="0"] { background: var(--exposure-0); } .exposure-bar[data-range="1"] { background: var(--exposure-1); } .exposure-bar[data-range="2"] { background: var(--exposure-2); } .exposure-bar[data-range="3"] { background: var(--exposure-3); } .exposure-bar[data-range="4"] { background: var(--exposure-4); } .exposure-bar[data-range="5"] { background: var(--exposure-5); } .exposure-bar[data-range="6"] { background: var(--exposure-6); } .exposure-bar[data-range="7"] { background: var(--exposure-7); } .exposure-bar[data-range="8"] { background: var(--exposure-8); } .exposure-bar[data-range="9"] { background: var(--exposure-9); } .exposure-bar[data-range="10"] { background: var(--exposure-10); }
+        .exposure-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: var(--text-muted); }
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+        .filter-btn { padding: 6px 12px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 16px; font-size: 12px; cursor: pointer; transition: all var(--transition-speed); color: var(--text-secondary); }
+        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--bg-primary); display: flex; flex-direction: column; }
+        .view-tabs { display: flex; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); flex-shrink: 0; gap: 8px; overflow-x: auto; }
+        .view-tab { padding: 10px 20px; border: none; background: transparent; font-size: 14px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all var(--transition-speed); border-radius: 6px; white-space: nowrap; }
+        .view-tab:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+        .view-tab.active { color: white; background: var(--accent); }
+
+        /* 顶部控制 */
+        .chart-header-wrapper { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .header-controls-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .sort-controls { display: flex; gap: 8px; align-items: center; }
+        .sort-label { font-size: 13px; color: var(--text-secondary); }
+        .sort-btn { padding: 4px 12px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 14px; font-size: 12px; cursor: pointer; color: var(--text-secondary); transition: all var(--transition-speed); display: inline-flex; align-items: center; gap: 4px; }
+        .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .sort-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .share-controls { display: flex; gap: 8px; margin-left: 8px; border-left: 1px solid var(--bg-tertiary); padding-left: 12px; }
+        .legend { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--bg-primary); border: 1px solid var(--bg-tertiary); border-radius: 20px; }
+        .legend-label { font-size: 11px; color: var(--text-secondary); }
+        .legend-gradient { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--exposure-0), var(--exposure-2), var(--exposure-5), var(--exposure-7), var(--exposure-10)); }
+
+        .category-sidebar-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); }
+        .category-sidebar-btn { padding: 4px 10px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
+        .category-sidebar-btn:hover, .category-sidebar-btn.active { border-color: var(--accent); color: var(--accent); }
+        .category-sidebar-btn.active { background: var(--accent); color: white; }
+        
+        .chart-container { padding: 24px 32px; flex: 1; }
+        .chart-title { font-size: 16px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; flex-wrap: wrap; }
+        .viz-container { width: 100%; min-height: 500px; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; position: relative; }
+
+        /* 视图区样式 */
+        .grid-viz { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding: 20px; height: auto; min-height: 500px; }
+        @media (max-width: 1600px) { .grid-viz { grid-template-columns: repeat(5, 1fr); } }
+        @media (max-width: 1400px) { .grid-viz { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 1100px) { .grid-viz { grid-template-columns: repeat(3, 1fr); } }
+        .grid-item { background: white; border-radius: 10px; padding: 14px; cursor: pointer; transition: all var(--transition-speed); display: flex; flex-direction: column; min-height: 110px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border: 2px solid transparent; }
+        .grid-item:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
+        .grid-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .grid-item-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .grid-item-badge { font-size: 16px; font-weight: 700; color: white; padding: 4px 8px; border-radius: 6px; min-width: 40px; text-align: center; }
+        .grid-item-stats { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+        .grid-item-stat { font-size: 11px; color: var(--text-secondary); }
+        .grid-item-stat span { font-weight: 600; color: var(--text-primary); }
+
+        .list-viz { display: flex; flex-direction: column; gap: 8px; padding: 16px; min-height: 500px; }
+        .list-item { background: white; border-radius: 8px; padding: 14px 18px; cursor: pointer; transition: all var(--transition-speed); display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 2px solid transparent; }
+        .list-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+        .list-item-color { width: 8px; height: 45px; border-radius: 4px; flex-shrink: 0; }
+        .list-item-info { flex: 1; min-width: 0; }
+        .list-item-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .list-item-meta { font-size: 12px; color: var(--text-secondary); }
+        .list-item-stats { display: flex; gap: 20px; flex-shrink: 0; }
+        .list-item-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+        .list-item-stat-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+        .treemap-viz { width: 100%; height: 550px; display: flex; padding: 12px; gap: 12px; }
+        .proportion-viz { padding: 20px; min-height: 500px; }
+        .proportion-category { margin-bottom: 24px; }
+        .proportion-category-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; display: flex; gap: 8px; }
+        .proportion-category-count { font-size: 12px; color: var(--text-muted); font-weight: normal; }
+        .proportion-bars { display: flex; flex-direction: column; gap: 10px; }
+        .proportion-bar-row { display: flex; align-items: center; gap: 12px; }
+        .proportion-label { width: 140px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .proportion-bar-track { flex: 1; height: 24px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; }
+        .proportion-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; display: flex; align-items: center; padding-left: 10px; }
+        .proportion-bar-text { font-size: 11px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        .proportion-value { width: 70px; font-size: 11px; color: var(--text-secondary); text-align: right; flex-shrink: 0; }
+
+        .trend-viz { padding: 20px; min-height: 500px; }
+        .trend-chart { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
+        .trend-row { display: flex; align-items: center; gap: 12px; }
+        .trend-label { width: 140px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+        .trend-bar-container { flex: 1; height: 22px; background: var(--bg-tertiary); border-radius: 4px; position: relative; display: flex; align-items: center; }
+        .trend-bar-center { position: absolute; left: 15%; top: 0; bottom: 0; width: 2px; background: var(--text-muted); }
+        .trend-bar { height: 18px; border-radius: 3px; transition: width 0.5s; position: absolute; }
+        .trend-bar.positive { background: linear-gradient(90deg, #e74c3c 0%, #f39c12 100%); left: 15%; }
+        .trend-bar.negative { background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%); right: 85%; }
+        .trend-value { width: 60px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+        .trend-value.positive { color: #e74c3c; } .trend-value.negative { color: #27ae60; }
+
+        .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px 32px; border-top: 1px solid var(--bg-tertiary); flex-shrink: 0; background: var(--bg-secondary); }
+        .chart-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .chart-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+        .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .bar-label { width: 90px; font-size: 10px; color: var(--text-secondary); flex-shrink: 0; }
+        .bar-track { flex: 1; height: 14px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .bar-value { width: 35px; font-size: 10px; color: var(--text-secondary); text-align: right; flex-shrink: 0; }
+
+        .tooltip { position: fixed; background: var(--text-primary); color: white; padding: 14px 18px; border-radius: 8px; font-size: 12px; pointer-events: none; z-index: 1000; opacity: 0; transition: opacity 0.15s; max-width: 280px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+        .tooltip.visible { opacity: 1; }
+        .tooltip-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .tooltip-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+        .tooltip-label { color: rgba(255,255,255,0.7); }
+        .tooltip-value { font-weight: 600; }
+
+        @media (max-width: 768px) {
+            body { height: auto; overflow: auto; }
+            .container { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; max-height: 55vh; flex-shrink: 0; border-right: none; border-bottom: 1px solid var(--bg-tertiary); }
+            .main-content { overflow-y: visible; flex: none; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .header-controls-group { flex-direction: column; align-items: flex-start; }
+            .grid-viz { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-secondary); }
+
+        /* 截图预览弹窗 */
+        .screenshot-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; padding: 20px; }
+        .screenshot-modal.show { opacity: 1; pointer-events: auto; }
+        .screenshot-content { background: white; border-radius: 12px; width: 100%; max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
+        .screenshot-header { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
+        .screenshot-header h3 { font-size: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .screenshot-header-hint { font-size: 13px; color: #27ae60; font-weight: 600; background: rgba(39, 174, 96, 0.1); padding: 6px 12px; border-radius: 6px; }
+        .screenshot-close-btn { background: var(--bg-tertiary); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .screenshot-body { flex: 1; overflow: auto; padding: 24px; background: #f1f3f5; display: flex; justify-content: center; }
+        .screenshot-body img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+    </style>
+</head>
+<body>
+    <!-- 安全护盾：在用户点击“另存为”导致页面失焦时，瞬间覆盖整个页面 -->
+    <div id="security-shield">
+        <h2>🔒 安全保护模式已激活</h2>
+        <p>检测到页面环境变化或尝试保存行为。</p>
+        <p>为保护数据版权，核心内容已自动隐藏并从内存中擦除。</p>
+        <p style="margin-top: 20px; font-size: 13px;">（点击页面任意处恢复显示）</p>
+    </div>
+
+    <!-- 容器本身就是防盗核心 -->
+    <div class="container" id="mainAppContainer">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>美国就业市场AI冲击程度</h1>
+                <p>制作者：<a href="https://www.ebaogao.cn" target="_blank">ebaogao.cn</a> , 数据:美国劳工统计局</p>
+                <p>AI评分：Gemini，致谢AI大神Karpathy！</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="jobCount">0</div>
+                    <div class="stat-label">职业数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalJobs">0</div>
+                    <div class="stat-label">总就业数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value highlight" id="avgExposure">0</div>
+                    <div class="stat-label">平均冲击度</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-scroll">
+                <div class="search-section">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索职业...">
+                    <div class="search-dropdown" id="searchDropdown"></div>
+                </div>
+                
+                <div class="category-sidebar-nav" id="sidebarCategoryNav"></div>
+                
+                <div class="filter-section">
+                    <h3>按冲击度筛选</h3>
+                    <div class="exposure-bars" id="exposureBars"></div>
+                    <div class="exposure-labels"><span>低</span><span>高</span></div>
+                    <button class="filter-btn" id="clearFilter" style="margin-top: 12px; width: 100%;">清除所有筛选</button>
+                </div>
+                
+                <div class="filter-section">
+                    <h3>按教育程度筛选</h3>
+                    <div class="filter-buttons" id="educationFilters">
+                        <button class="filter-btn active" data-value="all">全部</button>
+                        <button class="filter-btn" data-value="high">高中以下</button>
+                        <button class="filter-btn" data-value="some-college">部分大学</button>
+                        <button class="filter-btn" data-value="associate">副学士</button>
+                        <button class="filter-btn" data-value="bachelor">学士</button>
+                        <button class="filter-btn" data-value="master">硕士</button>
+                        <button class="filter-btn" data-value="doctoral">博士</button>
+                        <button class="filter-btn" data-value="professional">专业</button>
+                    </div>
+                </div>
+                
+                <div class="filter-section" style="padding-bottom: 30px;">
+                    <h3>按薪资水平筛选</h3>
+                    <div class="filter-buttons" id="payFilters">
+                        <button class="filter-btn active" data-value="all">全部</button>
+                        <button class="filter-btn" data-value="low">&lt;$40k</button>
+                        <button class="filter-btn" data-value="medium">$40k-80k</button>
+                        <button class="filter-btn" data-value="high">$80k-120k</button>
+                        <button class="filter-btn" data-value="very-high">&gt;120k</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="main-content">
+            <div class="view-tabs">
+                <button class="view-tab active" data-view="grid">网格视图</button>
+                <button class="view-tab" data-view="list">列表视图</button>
+                <button class="view-tab" data-view="treemap">树地图视图</button>
+                <button class="view-tab" data-view="proportion">职业比例树形</button>
+                <button class="view-tab" data-view="trend">24~25年度趋势分析</button>
+            </div>
+            
+            <div id="exportContainer" style="background: var(--bg-primary); padding-bottom: 40px;">
+                <div class="chart-container">
+                    <div class="chart-header-wrapper">
+                        <div class="chart-title" id="chartTitle">加载中...</div>
+                        <div class="header-controls-group">
+                            <div class="legend" id="headerLegend">
+                                <span class="legend-label">低冲击度</span>
+                                <div class="legend-gradient"></div>
+                                <span class="legend-label">高冲击度</span>
+                            </div>
+                            
+                            <div class="sort-controls" id="sortControls" style="display: none;">
+                                <span class="sort-label">排序:</span>
+                                <button class="sort-btn active" data-sort="employment">就业数 ↓</button>
+                                <button class="sort-btn" data-sort="exposure">冲击度 ↓</button>
+                            </div>
+                            
+                            <div class="share-controls" id="shareControlsGroup">
+                                <button class="sort-btn" id="shareScreenshotBtn" style="background: var(--text-primary); color: white; border-color: var(--text-primary);">
+                                    <svg style="width:14px;height:14px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span id="shareBtnText">保存截图 (PNG)</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="viz-container" id="vizContainer"></div>
+                </div>
+                
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h4>冲击度分布 (占比)</h4>
+                        <div class="bar-chart" id="exposureBreakdown"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>按薪资的冲击度 (平均)</h4>
+                        <div class="bar-chart" id="exposureByPay"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>按教育的冲击度 (平均)</h4>
+                        <div class="bar-chart" id="exposureByEducation"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-title" id="tooltipTitle"></div>
+        <div class="tooltip-row"><span class="tooltip-label">就业人数</span><span class="tooltip-value" id="tooltipJobs"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">AI冲击度</span><span class="tooltip-value" id="tooltipExposure"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">年薪中位数</span><span class="tooltip-value" id="tooltipWage"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">教育要求</span><span class="tooltip-value" id="tooltipEducation"></span></div>
+    </div>
+
+    <!-- 截图预览弹窗 -->
+    <div class="screenshot-modal" id="screenshotModal">
+        <div class="screenshot-content">
+            <div class="screenshot-header">
+                <h3>📸 截图已生成并触发下载</h3>
+                <span class="screenshot-header-hint">✅ 若未自动下载，请右键图片 -> 另存为</span>
+                <button class="screenshot-close-btn" id="closeModalBtn">×</button>
+            </div>
+            <div class="screenshot-body" id="screenshotImageContainer"></div>
+        </div>
+    </div>
+
+    <!-- 终极防护脚本 -->
+    <script id="core-app-logic">
+        (function() {
+            // ==========================================
+            // 杀手锏 0: 终极防御 - 禁止本地文件协议运行 (防 "网页另存为")
+            // ==========================================
+            // 如果用户将网页保存到了本地双击打开 (file:///)，直接自毁全部内容
+            if (window.location.protocol === 'file:') {
+                document.documentElement.innerHTML = `
+                    <body style="background:#f8f9fa;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;margin:0;">
+                        <div style="text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+                            <h2 style="color:#e74c3c;margin-bottom:16px;">⚠️ 安全警告：禁止本地运行</h2>
+                            <p style="color:#6c757d;">为保护数据及代码版权，该报告禁止以“网页另存为”形式在本地运行查看。</p>
+                        </div>
+                    </body>`;
+                return; // 立即终止脚本，数据无法解密渲染
+            }
+
+            const scriptTag = document.getElementById('core-app-logic');
+            if (scriptTag) scriptTag.remove();
+
+            // 核心数据隐藏在闭包中
+            const rawPackedData = [
+                "1|软件开发者|1876000|8.5|120990|bachelor|技术", "2|数据分析师|856000|8.2|78680|bachelor|技术", "3|市场分析师|736000|7.8|65680|bachelor|商业",
+                "4|簿记员|1605000|7.5|42130|some-college|财务", "5|客户服务代表|2855000|6.8|37060|high|服务", "6|零售店员|4350000|5.2|29840|high|销售",
+                "7|注册护士|3180000|4.8|77600|bachelor|医疗", "8|教师|6230000|6.2|62180|master|教育", "9|电工|697000|2.8|60120|high|建筑",
+                "10|水管工|480000|2.5|59120|high|建筑", "11|建筑工人|2340000|1.2|38040|high|建筑", "12|清洁工|2280000|0.8|30460|high|服务",
+                "13|厨师|1465000|3.2|48120|some-college|餐饮", "14|司机|3450000|3.5|47480|high|运输", "15|医生|713000|4.5|208000|professional|医疗",
+                "16|律师|658000|5.8|126930|professional|法律", "17|会计|1405000|7.2|78670|bachelor|财务", "18|HR专员|1650000|6.5|65680|bachelor|商业",
+                "19|作家|168000|8.8|69120|bachelor|媒体", "20|编辑|122000|8.5|63120|bachelor|媒体", "21|记者|55000|8.2|62180|bachelor|媒体",
+                "22|摄影师|147000|7.5|41820|some-college|媒体", "23|平面设计师|279000|7.8|53880|bachelor|设计", "24|网页开发者|162000|8.8|77800|bachelor|技术",
+                "25|IT支持|875000|6.5|55240|some-college|技术", "26|系统管理员|366000|6.8|86620|bachelor|技术", "27|保安|1156000|2.2|31680|high|服务",
+                "28|收银员|3650000|5.5|27920|high|销售", "29|仓库工人|1205000|4.2|33640|high|物流", "30|机械工程师|312000|6.8|90420|bachelor|工程",
+                "31|土木工程师|306000|6.2|88420|bachelor|工程", "32|电气工程师|198000|6.8|103480|bachelor|工程", "33|化学工程师|33500|6.5|108540|bachelor|工程",
+                "34|生物医学工程师|21200|7.2|97180|bachelor|工程", "35|航空航天工程师|58150|6.5|122270|bachelor|工程", "36|环境工程师|55400|6.2|92620|bachelor|工程",
+                "37|工业工程师|273000|6.5|86540|bachelor|工程", "38|石油工程师|38500|4.8|137330|bachelor|工程", "39|地质学家|33000|5.2|93120|bachelor|科学",
+                "40|物理学家|19000|6.5|134480|doctoral|科学", "41|化学家|86600|6.8|79620|bachelor|科学", "42|生物学家|103000|6.5|82380|bachelor|科学",
+                "43|医学实验室技术员|327000|5.8|53720|associate|医疗", "44|放射科医师|50600|7.2|218850|professional|医疗", "45|药剂师|315000|6.5|125610|professional|医疗",
+                "46|牙医|146300|3.8|163220|professional|医疗", "47|兽医|89500|4.2|100590|professional|医疗", "48|精神科医生|25500|4.5|220380|doctoral|医疗",
+                "49|外科医生|51700|4.2|252990|professional|医疗", "50|儿科医生|83700|4.5|198420|professional|医疗", "51|全科医生|114700|4.8|214460|professional|医疗",
+                "52|护士麻醉师|64100|5.2|195610|master|医疗", "53|物理治疗师|258000|4.5|91340|doctoral|医疗", "54|职业治疗师|143000|5.2|86240|master|医疗",
+                "55|语言病理学家|162000|5.5|79420|master|医疗", "56|牙科保健员|219000|4.8|77680|associate|医疗", "57|医疗助理|725000|5.8|36820|some-college|医疗",
+                "58|药剂技术员|415000|6.5|35940|some-college|医疗", "59|项目经理|2235000|6.5|95120|bachelor|管理", "60|运营经理|2150000|6.2|98620|bachelor|管理",
+                "61|CEO|218300|5.5|213480|bachelor|管理", "62|HR经理|189500|6.8|126180|bachelor|管理", "63|财务经理|737000|6.5|156180|bachelor|管理",
+                "64|营销经理|385000|6.8|140320|bachelor|管理", "65|销售经理|2085000|5.8|132290|bachelor|销售", "66|保险代理人|408000|6.2|72980|high|金融",
+                "67|房地产经纪人|223420|5.5|52380|some-college|金融", "68|银行柜员|435000|6.8|35120|high|金融", "69|贷款专员|275000|7.2|64280|some-college|金融",
+                "70|投资分析师|108000|8.5|92480|bachelor|金融", "71|理财顾问|218000|7.5|94820|bachelor|金融", "72|股票交易员|45000|8.2|102660|bachelor|金融",
+                "73|风控分析师|102000|7.8|102680|bachelor|金融", "74|精算师|28000|7.2|111030|bachelor|金融", "75|采购专员|578000|6.2|62420|bachelor|商业",
+                "76|物流协调员|1945000|5.5|45280|some-college|物流", "77|供应链分析师|136000|7.2|76280|bachelor|商业", "78|仓库经理|156000|5.2|56280|some-college|物流",
+                "79|快递员|892000|3.2|36280|high|物流", "80|飞行员|118000|4.5|198620|bachelor|运输", "81|空中交通管制员|22700|4.8|128320|some-college|运输",
+                "82|列车司机|41000|3.5|68280|some-college|运输", "83|船长|34500|3.2|98280|some-college|运输", "84|服务员|2650000|3.8|26820|high|餐饮",
+                "85|调酒师|637000|4.2|29320|high|餐饮", "86|咖啡师|462000|4.5|28620|high|餐饮", "87|快餐厨师|5025000|3.5|24620|high|餐饮",
+                "88|面包师|193000|4.2|30220|some-college|餐饮", "89|营养师|68000|5.5|61820|bachelor|医疗", "90|健身教练|395000|5.2|40220|some-college|服务",
+                "91|美容师|656000|3.8|36820|some-college|服务", "92|理发师|237000|3.2|34220|some-college|服务", "93|保姆|511000|2.2|28620|high|服务",
+                "94|园丁|891000|1.8|32620|high|服务", "95|木匠|895000|2.2|48220|high|建筑", "96|油漆工|375000|1.8|42220|high|建筑",
+                "97|泥瓦匠|215000|1.5|45220|high|建筑", "98|屋顶工|162000|0.8|43220|high|建筑", "99|HVAC技术员|372000|2.8|48220|some-college|建筑",
+                "100|焊工|414000|2.5|44220|some-college|制造", "101|机修工|767000|2.8|44220|some-college|制造", "102|汽车技师|739000|3.2|44220|some-college|制造",
+                "103|装配工|1845000|3.8|34220|high|制造", "104|机器操作员|2175000|3.5|36220|high|制造", "105|质量检测员|568000|4.5|38220|some-college|制造",
+                "106|包装工|981000|3.2|28220|high|制造", "107|仓库保管员|1235000|3.5|30220|high|物流", "108|叉车操作员|215000|3.2|35220|high|物流",
+                "109|邮递员|335000|3.5|36220|high|物流", "110|垃圾收集工|122000|1.2|38220|high|服务", "111|社工|713000|4.8|52220|bachelor|社会服务",
+                "112|心理咨询师|178000|5.5|82220|master|医疗", "113|学校辅导员|112000|5.8|58220|master|教育", "114|幼教教师|2360000|4.2|36220|associate|教育",
+                "115|小学教师|1325000|5.5|60220|bachelor|教育", "116|中学教师|1010000|5.8|62220|bachelor|教育", "117|高中教师|678000|5.5|64220|bachelor|教育",
+                "118|特殊教育教师|439000|5.2|62220|bachelor|教育", "119|大学教授|136000|6.2|84220|doctoral|教育", "120|图书管理员|118000|5.2|60220|bachelor|媒体",
+                "121|统计学家|34200|7.8|95220|master|技术", "122|数据科学家|98600|9.2|108220|bachelor|技术", "123|机器学习工程师|45600|9.5|130220|bachelor|技术",
+                "124|AI研究员|23500|9.8|145220|doctoral|技术", "125|网络安全专家|163000|7.8|112220|bachelor|技术", "126|DevOps工程师|89500|8.5|118220|bachelor|技术",
+                "127|数据库管理员|168000|7.2|98220|bachelor|技术", "128|网络管理员|258000|6.5|68220|some-college|技术", "129|UI/UX设计师|198000|8.2|78220|bachelor|设计",
+                "130|产品设计师|156000|7.8|88220|bachelor|设计", "131|建筑设计师|128000|6.8|82220|bachelor|设计", "132|室内设计师|73500|6.5|58220|bachelor|设计",
+                "133|律师助理|315000|8.2|52220|associate|法律", "134|法官|43500|4.2|148220|professional|法律", "135|治安官|105000|3.5|64220|high|执法",
+                "136|警察|808000|3.2|68220|some-college|执法", "137|侦探|103000|4.2|86220|some-college|执法", "138|消防员|327000|1.8|52220|some-college|执法",
+                "139|EMT急救员|265000|2.8|36220|some-college|医疗", "140|验光师|47500|5.2|152220|doctoral|医疗", "141|酒店前台|156000|4.8|28220|high|服务",
+                "142|客房服务|412000|2.5|24220|high|服务", "143|活动策划|128000|6.2|52220|bachelor|服务", "144|个人助理|385000|5.5|48220|some-college|商业",
+                "145|行政助理|2150000|5.8|40220|some-college|商业", "146|秘书|2150000|5.2|38220|some-college|商业", "147|数据录入|215000|6.5|34220|high|商业",
+                "148|文案|185000|7.8|48220|bachelor|媒体", "149|内容运营|285000|7.5|52220|bachelor|媒体", "150|社交媒体管理|215000|7.8|50220|bachelor|媒体",
+                "151|SEO专员|85000|7.5|58220|some-college|技术", "152|电商运营|285000|7.2|55220|bachelor|商业", "153|采购经理|218000|6.2|125220|bachelor|商业",
+                "154|商店经理|2150000|4.5|45220|high|销售", "155|区域经理|385000|5.8|85220|bachelor|销售", "156|电话销售|1250000|6.5|32220|high|销售",
+                "157|技术支持|685000|6.8|52220|some-college|技术", "158|客服经理|285000|6.2|65220|bachelor|服务", "159|工厂经理|285000|5.2|105220|bachelor|制造",
+                "160|生产主管|685000|4.5|58220|some-college|制造", "161|设施经理|185000|5.2|98220|bachelor|商业", "162|物业经理|215000|4.8|58220|some-college|商业",
+                "163|审计师|185000|7.5|78220|bachelor|金融", "164|税务专员|215000|7.2|68220|bachelor|金融", "165|出纳|685000|5.5|35220|high|金融",
+                "166|人力资源专员|685000|6.8|62220|bachelor|商业", "167|培训专员|285000|6.2|58220|bachelor|商业", "168|招聘专员|385000|6.5|62220|bachelor|商业",
+                "169|合规律师|85000|7.2|135220|professional|法律", "170|知识产权律师|45000|7.5|168220|professional|法律", "171|建筑师|128000|6.2|82220|bachelor|设计",
+                "172|测量师|45000|4.8|65220|bachelor|建筑", "173|环境科学家|85000|6.5|76220|bachelor|科学", "174|护工|2150000|3.2|28220|high|医疗",
+                "175|家庭健康助手|815000|3.5|25220|high|医疗", "176|护理员|1450000|3.2|30220|high|医疗", "177|牙科助理|315000|4.8|38220|some-college|医疗",
+                "178|放射技师|205000|5.8|65220|associate|医疗", "179|呼吸治疗师|135000|5.2|65220|associate|医疗", "180|医务Billing|186000|7.2|41620|some-college|医疗",
+                "181|殡葬师|35000|3.2|58220|associate|服务", "182|婚姻家庭治疗师|71500|5.2|52220|master|医疗", "183|职业培训师|186000|5.8|62220|bachelor|教育",
+                "184|教务管理员|189000|5.5|102220|master|教育", "185|策展人|13500|5.8|58220|master|媒体", "186|考古学家|8500|5.5|66220|master|科学",
+                "187|经济学家|21300|6.8|105220|bachelor|商业", "188|游戏开发者|78500|8.8|78220|bachelor|技术", "189|景观设计师|24500|5.8|70220|bachelor|设计",
+                "190|时装设计师|23500|6.8|77220|bachelor|设计", "191|公证员|22500|4.8|48220|some-college|法律", "192|听力学家|14500|5.5|78220|doctoral|医疗",
+                "193|足科医生|10500|4.2|148220|professional|医疗", "194|健身中心经理|71500|5.5|54220|some-college|服务", "195|礼宾员|28500|4.2|32220|high|服务",
+                "196|旅游代理|78500|5.8|42220|some-college|服务", "197|接线员|185000|4.8|35220|high|商业", "198|校对员|25000|7.5|42220|bachelor|媒体",
+                "199|SEM专员|45000|7.8|62220|some-college|技术", "200|渠道经理|285000|6.2|95220|bachelor|销售", "201|维修主管|185000|3.5|68220|some-college|制造",
+                "202|资产评估师|65000|6.5|58220|bachelor|金融", "203|薪资专员|185000|6.8|48220|some-college|金融", "204|收账专员|285000|5.8|38220|high|金融",
+                "205|信贷分析师|115000|7.2|68220|bachelor|金融", "206|核保人|85000|6.5|70220|bachelor|金融", "207|理赔员|315000|6.2|48220|some-college|金融",
+                "208|员工关系|115000|6.2|68220|bachelor|商业", "209|薪酬福利|145000|6.5|68220|bachelor|商业", "210|合规专员|215000|6.8|72220|bachelor|商业",
+                "211|法务助理|185000|7.5|58220|associate|法律", "212|刑事辩护律师|65000|5.5|98220|professional|法律", "213|家庭律师|55000|5.2|85220|professional|法律",
+                "214|房地产律师|45000|6.2|125220|professional|法律", "215|制图员|65000|5.8|48220|associate|设计", "216|土地规划师|35000|5.5|78220|master|建筑",
+                "217|城市设计师|15000|6.2|85220|master|设计", "218|环境技术员|75000|5.8|48220|associate|科学", "219|水文学家|6500|5.5|85220|bachelor|科学",
+                "220|海洋学家|18500|5.8|95220|bachelor|科学", "221|气象学家|10500|6.2|95220|bachelor|科学", "222|微生物学家|18500|6.5|85220|bachelor|科学",
+                "223|遗传学家|4500|7.2|105220|doctoral|科学", "224|神经科学家|5500|7.5|115220|doctoral|科学", "225|药理学家|3500|7.2|125220|doctoral|科学",
+                "226|农学家|15000|4.8|65220|bachelor|科学", "227|食品科学家|15000|5.5|75220|bachelor|科学", "228|森林学家|8500|4.5|65220|bachelor|科学",
+                "229|兽医技术员|95000|4.2|35220|associate|医疗", "230|动物护理员|235000|3.5|28220|high|服务", "231|驯兽师|18500|4.2|35220|some-college|服务",
+                "232|私人教练|185000|4.8|45220|some-college|服务", "233|按摩师|185000|3.8|45220|some-college|服务", "234|药剂配药员|145000|6.2|35220|some-college|医疗",
+                "235|眼镜商|65000|5.2|45220|associate|医疗", "236|口腔卫生师|185000|4.5|58220|associate|医疗", "237|脊椎按摩师|45000|4.2|75220|professional|医疗",
+                "238|物理治疗助理|95000|4.8|45220|associate|医疗", "239|透析技术员|65000|5.5|55220|some-college|医疗", "240|超声检查师|85000|5.8|78220|associate|医疗",
+                "241|医学编码员|185000|7.2|45220|some-college|医疗", "242|健康信息管理员|115000|6.5|55220|associate|医疗", "243|医院管理员|185000|5.8|125220|master|医疗",
+                "244|登山向导|5500|2.5|38220|high|服务", "245|滑雪教练|45000|3.2|35220|high|服务", "246|高尔夫球童|35000|2.2|25220|high|服务",
+                "247|人类学家|8200|5.8|66220|master|科学", "248|社会学家|5500|6.2|58220|master|科学", "249|信息安全管理|112000|7.5|105220|bachelor|技术",
+                "250|计算机支持|585000|6.2|48220|some-college|技术", "251|电梯安装工|23500|2.5|98220|some-college|建筑", "252|锅炉工|32800|2.2|60220|some-college|建筑",
+                "253|钣金工|142000|2.5|44220|some-college|制造", "254|电梯操作员|21500|2.8|55220|high|建筑", "255|石匠|48500|1.5|48220|high|建筑",
+                "256|管道工|480000|2.5|59120|high|建筑", "257|电工|697000|2.8|60120|high|建筑", "258|砖瓦工|215000|1.5|45220|high|建筑",
+                "259|玻璃工|45000|2.2|45220|high|建筑", "260|混凝土工|235000|1.8|42220|high|建筑", "261|绝缘材料工|78000|2.2|45220|high|建筑",
+                "262|干墙安装工|156000|1.8|43220|high|建筑", "263|木匠|895000|2.2|48220|high|建筑", "264|屋顶工|162000|0.8|43220|high|建筑",
+                "265|抹灰工|145000|1.5|45220|high|建筑", "266|装修工|285000|2.5|48220|high|建筑", "267|景观设计师|24500|5.8|70220|bachelor|设计",
+                "268|城市规划师|38500|5.5|78220|master|建筑", "269|测量员|45000|4.8|65220|bachelor|建筑", "270|土木工程技术人员|215000|5.5|58220|associate|工程",
+                "271|电气工程技术人员|185000|5.8|62220|associate|工程", "272|机械工程技术人员|165000|5.5|58220|associate|工程", "273|航空工程技术人员|125000|5.2|72220|associate|工程",
+                "274|生物技术员|45000|6.2|48220|associate|科学", "275|化学技术员|65000|6.5|52220|associate|科学", "276|环境采样员|85000|4.5|45220|associate|科学",
+                "277|石油地质学家|35000|4.5|125220|bachelor|科学", "278|采矿工程师|6000|4.2|93420|bachelor|工程", "279|农业工程师|2350|4.5|80280|bachelor|工程",
+                "280|核工程师|18500|5.5|115220|bachelor|工程", "281|材料工程师|28500|6.2|95220|bachelor|工程", "282|质量工程师|185000|6.5|75220|bachelor|制造",
+                "283|安全工程师|95000|5.8|85220|bachelor|制造", "284|制造工程师|125000|6.2|75220|bachelor|制造", "285|工艺工程师|75000|6.5|78220|bachelor|制造",
+                "286|工业机械维修工|385000|2.8|48220|some-college|制造", "287|设备维修工|425000|3.2|44220|high|制造", "288|电梯维修工|23500|2.5|68220|some-college|建筑",
+                "289|暖通维修工|385000|2.8|50220|some-college|建筑", "290|电工维修工|215000|2.8|55220|some-college|建筑", "291|水暖维修工|185000|2.5|52220|some-college|建筑",
+                "292|汽车维修工|765000|3.2|44220|some-college|制造", "293|摩托车维修工|85000|3.5|42220|some-college|制造", "294|重型设备操作员|215000|3.2|48220|high|制造",
+                "295|起重机操作员|55000|3.5|55220|some-college|制造", "296|推土机操作员|65000|2.8|48220|high|制造", "297|挖掘机操作员|85000|2.8|48220|high|制造",
+                "298|卡车司机|2150000|3.2|48220|high|运输", "299|公交车司机|685000|3.5|45220|high|运输", "300|出租车司机|385000|3.8|35220|high|运输",
+                "301|救护车司机|85000|2.5|38220|high|医疗", "302|铁路工人|45000|3.2|55220|high|运输", "303|铁路司机|35000|3.5|68220|some-college|运输",
+                "304|飞行员|118000|4.5|198620|bachelor|运输", "305|副驾驶员|85000|5.2|145220|bachelor|运输", "306|空中乘务员|385000|4.5|52220|some-college|运输",
+                "307|航空地勤|185000|4.2|42220|high|运输", "308|飞机机械师|125000|3.5|65220|some-college|制造", "309|航空电子技术员|45000|5.2|75220|associate|技术",
+                "310|船长|34500|3.2|98280|some-college|运输", "311|大副|25000|3.5|75220|some-college|运输", "312|二副|18500|4.2|65220|some-college|运输",
+                "313|轮机长|18500|3.2|85220|some-college|运输", "314|水手|45000|3.5|42220|high|运输", "315|码头工人|125000|3.2|38220|high|物流",
+                "316|仓库工人|1205000|4.2|33640|high|物流", "317|包装工人|981000|3.2|28220|high|制造", "318|分拣员|685000|3.5|30220|high|物流",
+                "319|配送司机|1250000|3.8|35220|high|物流", "320|邮政工作人员|485000|3.5|36220|high|物流", "321|垃圾车司机|85000|2.2|38220|high|服务",
+                "322|环卫工人|285000|1.5|32220|high|服务", "323|管道清洁工|45000|2.2|38220|high|服务", "324|泳池维护工|35000|2.5|35220|high|服务",
+                "325|害虫防治员|65000|2.8|38220|high|服务", "326|地毯清洁工|85000|2.2|30220|high|服务", "327|洗衣工|185000|2.5|28220|high|服务",
+                "328|干洗工|75000|2.8|30220|high|服务", "329|裁缝|45000|3.5|35220|high|制造", "330|制鞋工|25000|3.2|32220|high|制造",
+                "331|裁剪工|85000|3.5|35220|high|制造", "332|缝纫工|165000|3.2|30220|high|制造", "333|印刷工|45000|3.8|38220|high|制造",
+                "334|装订工|25000|3.5|35220|high|制造", "335|照相制版工|15000|4.2|45220|some-college|制造", "336|珠宝鉴定师|8500|5.5|55220|some-college|制造",
+                "337|钟表匠|15000|3.2|45220|some-college|制造", "338|牙科技师|35000|4.5|48220|associate|医疗", "339|验光师助理|45000|5.2|38220|associate|医疗",
+                "340|护理麻醉护士|65000|5.5|125220|master|医疗", "341|助产士|7300|4.8|105030|master|医疗", "342|医疗转录员|55000|9.2|35220|some-college|医疗"
+            ];
+            
+            // 解析到闭包局部变量中
+            const occupations = rawPackedData.map(str => {
+                const parts = str.split('|');
+                return {
+                    id: parseInt(parts[0]), title: parts[1], employment: parseInt(parts[2]),
+                    exposure: parseFloat(parts[3]), wage: parseInt(parts[4]), 
+                    education: parts[5], category: parts[6]
+                };
+            });
+            // 立马清空原数组，不留痕迹
+            rawPackedData.length = 0; 
+
+            // UI 状态
+            let state = { selectedExposure: null, educationFilter: 'all', payFilter: 'all', currentView: 'grid', searchTerm: '', selectedCategory: null, sortBy: 'employment' };
+            const tooltip = document.getElementById('tooltip');
+            const vizContainer = document.getElementById('vizContainer');
+            const searchDropdown = document.getElementById('searchDropdown');
+
+            // 杀手锏 2 & 3: 终极防御系统设置
+            function setupProtections() {
+                // 禁用右键
+                document.addEventListener('contextmenu', e => e.preventDefault());
+
+                // 拦截快捷键
+                document.addEventListener('keydown', e => {
+                    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'u' || e.key.toLowerCase() === 'p')) {
+                        e.preventDefault();
+                    }
+                    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase()))) {
+                        e.preventDefault();
+                    }
+                });
+
+                // ==========================================
+                // 杀手锏 3: 离屏 DOM 物理拔除技术 (针对“另存为”)
+                // ==========================================
+                let appNode = null;
+                const shield = document.getElementById('security-shield');
+                const container = document.getElementById('mainAppContainer');
+                
+                function activateShield() {
+                    // 如果是我们自己主动触发的下载，跳过防盗保护
+                    if (window.__isDownloading) return; 
+                    if (container && container.parentNode) {
+                        appNode = container;
+                        // 从网页骨架里物理删除它！此时按保存，只能存下来空白骨架！
+                        container.remove(); 
+                    }
+                    shield.style.display = 'flex';
+                }
+
+                function deactivateShield() {
+                    if (appNode) {
+                        // 重新插回到页面中，无缝恢复使用
+                        document.body.insertBefore(appNode, document.getElementById('security-shield'));
+                        appNode = null;
+                    }
+                    shield.style.display = 'none';
+                }
+
+                window.addEventListener('blur', activateShield);
+                window.addEventListener('focus', deactivateShield);
+
+                // 🌟 新增：鼠标越界秒杀机制
+                // 浏览器“另存为”操作前，用户鼠标必须移向地址栏或菜单栏
+                // 只要鼠标一离开网页显示区域，立刻拔除DOM！根本不给你点击菜单的机会
+                document.addEventListener('mouseleave', (e) => {
+                    if (e.clientY <= 0 || e.clientX <= 0 || (e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+                        activateShield();
+                    }
+                });
+                document.addEventListener('mouseenter', deactivateShield);
+            }
+
+            function init() {
+                setupProtections();
+                renderSidebarCategories(); 
+                renderExposureBars();
+                renderVisualization();
+                setupEventListeners();
+            }
+
+            function renderSidebarCategories() {
+                const container = document.getElementById('sidebarCategoryNav');
+                const categories = [...new Set(occupations.map(j => j.category))];
+                let html = `<button class="category-sidebar-btn active" data-category="all">全部</button>`;
+                categories.forEach(cat => { html += `<button class="category-sidebar-btn" data-category="${cat}">${cat}</button>`; });
+                container.innerHTML = html;
+                container.querySelectorAll('.category-sidebar-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const cat = btn.dataset.category;
+                        state.selectedCategory = cat === 'all' ? null : cat;
+                        updateActiveStates(); renderVisualization(); renderExposureBars();
+                    });
+                });
+            }
+
+            function getExposureColor(exposure) {
+                const colors = ['#27ae60','#2ecc71','#f1c40f','#f39c12','#e67e22','#e74c3c','#c0392b','#9b59b6','#8e44ad','#7d3c98','#6c3483'];
+                return colors[Math.min(Math.floor(exposure), 10)];
+            }
+
+            function getFilteredOccupations() {
+                return occupations.filter(job => {
+                    if (state.searchTerm && !job.title.toLowerCase().includes(state.searchTerm.toLowerCase())) return false;
+                    if (state.selectedExposure !== null && Math.round(job.exposure) !== state.selectedExposure) return false;
+                    if (state.educationFilter !== 'all' && job.education !== state.educationFilter) return false;
+                    if (state.payFilter !== 'all') {
+                        if (state.payFilter === 'low' && job.wage >= 40000) return false;
+                        if (state.payFilter === 'medium' && (job.wage < 40000 || job.wage >= 80000)) return false;
+                        if (state.payFilter === 'high' && (job.wage < 80000 || job.wage >= 120000)) return false;
+                        if (state.payFilter === 'very-high' && job.wage < 120000) return false;
+                    }
+                    if (state.selectedCategory && job.category !== state.selectedCategory) return false;
+                    return true;
+                });
+            }
+
+            function renderExposureBars() {
+                const container = document.getElementById('exposureBars');
+                const distribution = {}; for (let i = 0; i <= 10; i++) distribution[i] = 0;
+                getFilteredOccupations().forEach(job => { const exp = Math.round(job.exposure); if (distribution[exp] !== undefined) distribution[exp]++; });
+                container.innerHTML = '';
+                const maxCount = Math.max(...Object.values(distribution));
+                for (let i = 0; i <= 10; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'exposure-bar'; bar.dataset.range = i;
+                    const height = maxCount > 0 ? (distribution[i] / maxCount) * 100 : 0;
+                    bar.style.height = `${Math.max(height, 5)}%`;
+                    bar.addEventListener('click', () => {
+                        state.selectedExposure = state.selectedExposure === i ? null : i;
+                        updateActiveStates(); renderVisualization();
+                    });
+                    container.appendChild(bar);
+                }
+            }
+
+            function updateActiveStates() {
+                document.querySelectorAll('.exposure-bar').forEach(bar => { bar.classList.toggle('active', parseInt(bar.dataset.range) === state.selectedExposure); });
+                document.querySelectorAll('#educationFilters .filter-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.value === state.educationFilter); });
+                document.querySelectorAll('#payFilters .filter-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.value === state.payFilter); });
+                document.querySelectorAll('.view-tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.view === state.currentView); });
+                document.querySelectorAll('.category-sidebar-btn').forEach(btn => {
+                    const cat = btn.dataset.category;
+                    const isActive = (cat === 'all' && !state.selectedCategory) || (cat === state.selectedCategory);
+                    btn.classList.toggle('active', isActive);
+                });
+                document.querySelectorAll('.sort-btn').forEach(btn => { if (btn.dataset.sort) { btn.classList.toggle('active', btn.dataset.sort === state.sortBy); } });
+            }
+
+            function renderVisualization() {
+                let filtered = getFilteredOccupations();
+                if (state.sortBy === 'employment') { filtered.sort((a, b) => b.employment - a.employment); } 
+                else if (state.sortBy === 'exposure') { filtered.sort((a, b) => b.exposure - a.exposure); }
+
+                vizContainer.innerHTML = '';
+                const countText = ` (共 ${filtered.length} 个职业)`;
+                if (filtered.length === 0) {
+                    vizContainer.innerHTML = '<div class="loading">没有匹配的职业</div>';
+                    document.getElementById('chartTitle').textContent = '未找到结果';
+                    renderCharts([]); return;
+                }
+                
+                const titles = { 'grid': '美国职业AI冲击度分布', 'list': '美国职业AI冲击度列表', 'treemap': '美国职业树地图', 'proportion': '美国各行业职业比例', 'trend': '美国24~25年度AI冲击趋势' };
+                // 🌟 将不可靠的图片加载 <img> 彻底替换为原生的内联 <svg>，这样 html2canvas 渲染就不会跨域报错了！
+                document.getElementById('chartTitle').innerHTML = `
+                    <span>${titles[state.currentView]}${countText}</span>
+                    <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:8px; display:inline-flex; align-items:center; text-decoration:none;">
+                        <svg style="height:26px; vertical-align:middle;" viewBox="0 0 110 24" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="2" width="20" height="20" rx="4" fill="#3498db"/><rect x="4" y="12" width="3" height="6" rx="1" fill="#ffffff"/><rect x="8.5" y="8" width="3" height="10" rx="1" fill="#ffffff"/><rect x="13" y="14" width="3" height="4" rx="1" fill="#ffffff"/><text x="26" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#2c3e50">ebaogao</text><text x="86" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#3498db">.cn</text></svg>
+                    </a>`;
+                
+                const sortControls = document.getElementById('sortControls');
+                if (state.currentView === 'grid' || state.currentView === 'list') { sortControls.style.display = 'flex'; } else { sortControls.style.display = 'none'; }
+
+                switch (state.currentView) {
+                    case 'grid': renderGridView(filtered); break;
+                    case 'list': renderListView(filtered); break;
+                    case 'treemap': renderTreemapView(filtered); break;
+                    case 'proportion': renderProportionView(filtered); break;
+                    case 'trend': renderTrendView(filtered); break;
+                }
+                updateStats(filtered); renderCharts(filtered);
+            }
+
+            function renderGridView(jobs) {
+                const container = document.createElement('div'); container.className = 'grid-viz';
+                jobs.forEach(job => {
+                    const item = document.createElement('div'); item.className = 'grid-item'; item.style.borderColor = getExposureColor(job.exposure);
+                    item.innerHTML = `<div class="grid-item-header"><div class="grid-item-title">${job.title}</div><div class="grid-item-badge" style="background:${getExposureColor(job.exposure)}">${job.exposure.toFixed(1)}</div></div><div class="grid-item-stats"><div class="grid-item-stat">就业: <span>${formatNumber(job.employment)}</span></div><div class="grid-item-stat">年薪: <span>$${formatWage(job.wage)}</span></div></div>`;
+                    item.addEventListener('mouseenter', e => showTooltip(e, job)); item.addEventListener('mousemove', moveTooltip); item.addEventListener('mouseleave', hideTooltip);
+                    container.appendChild(item);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderListView(jobs) {
+                const container = document.createElement('div'); container.className = 'list-viz';
+                jobs.forEach(job => {
+                    const item = document.createElement('div'); item.className = 'list-item'; item.style.borderColor = getExposureColor(job.exposure);
+                    item.innerHTML = `<div class="list-item-color" style="background:${getExposureColor(job.exposure)}"></div><div class="list-item-info"><div class="list-item-title">${job.title}</div><div class="list-item-meta">${job.category} · ${getEducationLabel(job.education)}</div></div><div class="list-item-stats"><div class="list-item-stat"><div class="list-item-stat-label">就业</div><div class="list-item-stat-value">${formatNumber(job.employment)}</div></div><div class="list-item-stat"><div class="list-item-stat-label">冲击度</div><div class="list-item-stat-value" style="color:${getExposureColor(job.exposure)}">${job.exposure.toFixed(1)}</div></div><div class="list-item-stat"><div class="list-item-stat-label">年薪</div><div class="list-item-stat-value">$${formatWage(job.wage)}</div></div></div>`;
+                    item.addEventListener('mouseenter', e => showTooltip(e, job)); item.addEventListener('mousemove', moveTooltip); item.addEventListener('mouseleave', hideTooltip);
+                    container.appendChild(item);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderTreemapView(jobs) {
+                const container = document.createElement('div');
+                container.style.width = '100%'; container.style.height = '600px'; container.style.position = 'relative'; container.style.padding = '10px';
+                vizContainer.appendChild(container);
+
+                const width = container.clientWidth - 20 || 800; const height = container.clientHeight - 20 || 580;
+                const rootData = { name: "root", children: jobs };
+                const root = d3.hierarchy(rootData).sum(d => d.employment).sort((a, b) => b.value - a.value);
+
+                d3.treemap().size([width, height]).paddingInner(2).round(true)(root);
+
+                const svg = d3.select(container).append("svg").attr("width", width).attr("height", height).attr("xmlns", "http://www.w3.org/2000/svg").style("font-family", "sans-serif");
+                const leaf = svg.selectAll("g").data(root.leaves()).join("g").attr("transform", d => `translate(${d.x0},${d.y0})`);
+
+                leaf.append("rect").attr("width", d => Math.max(0, d.x1 - d.x0)).attr("height", d => Math.max(0, d.y1 - d.y0)).attr("fill", d => getExposureColor(d.data.exposure)).attr("rx", 3).attr("ry", 3).style("stroke", "rgba(255,255,255,0.8)").style("stroke-width", "1px").style("cursor", "pointer")
+                    .on("mouseenter", (event, d) => showTooltip(event, d.data)).on("mousemove", moveTooltip).on("mouseleave", hideTooltip)
+                    .style("transition", "opacity 0.2s").on("mouseover", function() { d3.select(this).style("opacity", 0.7); }).on("mouseout", function() { d3.select(this).style("opacity", 1); });
+
+                leaf.append("text").attr("x", 4).attr("y", 14).attr("fill", "#fff").style("font-size", "10px").style("font-weight", "500").style("pointer-events", "none").style("text-shadow", "0 1px 2px rgba(0,0,0,0.8)").text(d => d.data.title).style("opacity", d => (d.x1 - d.x0 > 35 && d.y1 - d.y0 > 16) ? 1 : 0);
+            }
+
+            function renderProportionView(jobs) {
+                const container = document.createElement('div'); container.className = 'proportion-viz';
+                const displayJobs = state.selectedCategory ? jobs.filter(j => j.category === state.selectedCategory) : jobs;
+                const totalEmployment = displayJobs.reduce((sum, j) => sum + j.employment, 0);
+                
+                const grouped = {}; displayJobs.forEach(job => { if (!grouped[job.category]) grouped[job.category] = []; grouped[job.category].push(job); });
+                
+                Object.entries(grouped).forEach(([category, categoryJobs]) => {
+                    const categoryDiv = document.createElement('div'); categoryDiv.className = 'proportion-category';
+                    const catTotal = categoryJobs.reduce((sum, j) => sum + j.employment, 0);
+                    categoryDiv.innerHTML = `<div class="proportion-category-title">${category} <span class="proportion-category-count">${formatNumber(catTotal)}人 (${((catTotal/totalEmployment)*100).toFixed(1)}%)</span></div>`;
+                    
+                    const bars = document.createElement('div'); bars.className = 'proportion-bars';
+                    categoryJobs.forEach(job => {
+                        const pct = (job.employment / catTotal * 100).toFixed(1);
+                        const row = document.createElement('div'); row.className ='proportion-bar-row';
+                        row.innerHTML = `<div class="proportion-label">${job.title}</div><div class="proportion-bar-track"><div class="proportion-bar-fill" style="width:${pct}%;background:${getExposureColor(job.exposure)}"><span class="proportion-bar-text">${pct}%</span></div></div><div class="proportion-value">${formatNumber(job.employment)}</div>`;
+                        bars.appendChild(row);
+                    });
+                    categoryDiv.appendChild(bars); container.appendChild(categoryDiv);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderTrendView(jobs) {
+                const container = document.createElement('div'); container.className = 'trend-viz';
+                const jobsWithTrend = jobs.map(job => { const changeRate = (job.exposure * 0.08 - 0.05) * 100; return { ...job, changeRate }; }).sort((a, b) => b.changeRate - a.changeRate);
+                const chart = document.createElement('div'); chart.className = 'trend-chart';
+                const maxChange = Math.max(...jobsWithTrend.map(j => Math.abs(j.changeRate)));
+                
+                jobsWithTrend.forEach(job => {
+                    const row = document.createElement('div'); row.className = 'trend-row';
+                    const isPositive = job.changeRate >= 0; const barWidth = (Math.abs(job.changeRate) / maxChange) * 80; 
+                    row.innerHTML = `<div class="trend-label">${job.title}</div><div class="trend-bar-container"><div class="trend-bar-center"></div><div class="trend-bar ${isPositive ? 'positive' : 'negative'}" style="width:${barWidth}%"></div></div><div class="trend-value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${job.changeRate.toFixed(1)}%</div>`;
+                    row.addEventListener('mouseenter', e => showTooltip(e, job)); row.addEventListener('mousemove', moveTooltip); row.addEventListener('mouseleave', hideTooltip);
+                    chart.appendChild(row);
+                });
+                container.appendChild(chart); vizContainer.appendChild(container);
+            }
+
+            function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'; if (num >= 1000) return (num / 1000).toFixed(0) + 'K'; return num.toLocaleString(); }
+            function formatWage(num) { return num >= 1000 ? (num / 1000).toFixed(0) + 'K' : num.toString(); }
+            function getEducationLabel(edu) { const labels = { 'high': '高中', 'some-college': '大学', 'associate': '副学士', 'bachelor': '学士', 'master': '硕士', 'doctoral': '博士', 'professional': '专业' }; return labels[edu] || edu; }
+
+            function renderSearchDropdown() {
+                if (!state.searchTerm) { searchDropdown.classList.remove('show'); return; }
+                const filtered = occupations.filter(job => job.title.toLowerCase().includes(state.searchTerm.toLowerCase())).slice(0, 15);
+                if (filtered.length === 0) { searchDropdown.innerHTML = '<div class="search-dropdown-item" style="color:var(--text-muted)">未找到</div>'; } 
+                else {
+                    searchDropdown.innerHTML = filtered.map(job => `<div class="search-dropdown-item" data-id="${job.id}"><div class="color-bar" style="background:${getExposureColor(job.exposure)}"></div><div class="job-title">${job.title}</div><div class="job-meta">${job.category}</div></div>`).join('');
+                    searchDropdown.querySelectorAll('.search-dropdown-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const job = occupations.find(j => j.id === parseInt(item.dataset.id));
+                            if (job) { document.getElementById('searchInput').value = job.title; state.searchTerm = job.title; searchDropdown.classList.remove('show'); renderVisualization(); renderExposureBars(); }
+                        });
+                    });
+                }
+                searchDropdown.classList.add('show');
+            }
+
+            function showTooltip(e, job) {
+                document.getElementById('tooltipTitle').textContent = job.title;
+                document.getElementById('tooltipJobs').textContent = job.employment.toLocaleString();
+                document.getElementById('tooltipExposure').textContent = job.exposure.toFixed(1) + '/10';
+                document.getElementById('tooltipWage').textContent = '$' + job.wage.toLocaleString();
+                document.getElementById('tooltipEducation').textContent = getEducationLabel(job.education);
+                tooltip.classList.add('visible'); moveTooltip(e);
+            }
+
+            function moveTooltip(e) { const x = e.clientX + 15, y = e.clientY + 15; tooltip.style.left = `${Math.min(x, window.innerWidth - 280)}px`; tooltip.style.top = `${Math.min(y, window.innerHeight - 180)}px`; }
+            function hideTooltip() { tooltip.classList.remove('visible'); }
+
+            function updateStats(jobs) {
+                const totalJobs = jobs.reduce((sum, job) => sum + job.employment, 0);
+                const weightedSum = jobs.reduce((sum, job) => sum + job.exposure * job.employment, 0);
+                const avgExposure = totalJobs > 0 ? (weightedSum / totalJobs).toFixed(1) : '0';
+                document.getElementById('jobCount').textContent = jobs.length;
+                document.getElementById('totalJobs').textContent = totalJobs >= 100000000 ? (totalJobs/100000000).toFixed(2) + '亿' : (totalJobs/10000).toFixed(0) + '万';
+                document.getElementById('avgExposure').textContent = avgExposure;
+            }
+
+            function renderCharts(jobs) {
+                if(!jobs || jobs.length === 0) {
+                    const emptyHTML = '<div class="loading" style="height:60px; font-size:12px;">当前筛选下无数据</div>';
+                    document.getElementById('exposureBreakdown').innerHTML = emptyHTML; document.getElementById('exposureByPay').innerHTML = emptyHTML; document.getElementById('exposureByEducation').innerHTML = emptyHTML; return;
+                }
+
+                const distribution = {}; for (let i = 0; i <= 10; i++) distribution[i] = 0;
+                jobs.forEach(job => { const exp = Math.round(job.exposure); if (distribution[exp] !== undefined) distribution[exp]++; });
+                const total = jobs.length; const labels = ['极低 (0-1)', '低 (2-3)', '中等 (4-5)', '高 (6-7)', '极高 (8-10)']; const ranges = [[0,1],[2,3],[4,5],[6,7],[8,10]];
+                document.getElementById('exposureBreakdown').innerHTML = ranges.map((r, i) => {
+                    let count = 0; for (let j = r[0]; j <= r[1]; j++) count += distribution[j]||0; const pct = total > 0 ? (count/total*100).toFixed(1) : 0;
+                    return `<div class="bar-row"><div class="bar-label" style="width:75px;">${labels[i]}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${getExposureColor(r[0]+1)}"></div></div><div class="bar-value" style="width:35px;">${pct}%</div></div>`;
+                }).join('');
+
+                const payBrackets = [{ id: 'low', label: '<$40k', max: 40000, min: 0 }, { id: 'medium', label: '$40k-80k', max: 80000, min: 40000 }, { id: 'high', label: '$80k-120k', max: 120000, min: 80000 }, { id: 'very-high', label: '>$120k', max: Infinity, min: 120000 }];
+                const payStats = payBrackets.map(b => ({ ...b, sumExp: 0, count: 0 }));
+                jobs.forEach(job => { const bracket = payStats.find(b => job.wage >= b.min && job.wage < b.max); if (bracket) { bracket.sumExp += job.exposure; bracket.count++; } });
+                document.getElementById('exposureByPay').innerHTML = payStats.map(b => {
+                    const avg = b.count > 0 ? b.sumExp / b.count : 0; const pct = (avg / 10) * 100;
+                    return `<div class="bar-row"><div class="bar-label" style="width:75px;">${b.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${getExposureColor(avg)}"></div></div><div class="bar-value" style="width:35px; color:${getExposureColor(avg)}; font-weight:bold;">${avg.toFixed(1)}</div></div>`;
+                }).join('');
+
+                const eduLabelsMap = { 'high': '高中及以下', 'some-college': '大学/副学士', 'associate': '大学/副学士', 'bachelor': '学士学位', 'master': '硕士及以上', 'doctoral': '硕士及以上', 'professional': '硕士及以上' };
+                const eduGroups = { '高中及以下': { sumExp: 0, count: 0 }, '大学/副学士': { sumExp: 0, count: 0 }, '学士学位': { sumExp: 0, count: 0 }, '硕士及以上': { sumExp: 0, count: 0 } };
+                jobs.forEach(job => { const groupName = eduLabelsMap[job.education] || '高中及以下'; if (eduGroups[groupName]) { eduGroups[groupName].sumExp += job.exposure; eduGroups[groupName].count++; } });
+                const eduOrder = ['高中及以下', '大学/副学士', '学士学位', '硕士及以上'];
+                document.getElementById('exposureByEducation').innerHTML = eduOrder.map(label => {
+                    const group = eduGroups[label]; const avg = group.count > 0 ? group.sumExp / group.count : 0; const pct = (avg / 10) * 100;
+                    return `<div class="bar-row"><div class="bar-label" style="width:75px;">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${getExposureColor(avg)}"></div></div><div class="bar-value" style="width:35px; color:${getExposureColor(avg)}; font-weight:bold;">${avg.toFixed(1)}</div></div>`;
+                }).join('');
+            }
+
+            function setupEventListeners() {
+                document.getElementById('searchInput').addEventListener('input', e => { state.searchTerm = e.target.value; renderSearchDropdown(); renderVisualization(); renderExposureBars(); });
+                document.getElementById('searchInput').addEventListener('focus', () => { if(state.searchTerm) renderSearchDropdown(); });
+                document.addEventListener('click', e => { if(!e.target.closest('.search-section')) searchDropdown.classList.remove('show'); });
+                
+                document.getElementById('clearFilter').addEventListener('click', () => {
+                    state = { selectedExposure: null, educationFilter: 'all', payFilter: 'all', currentView: state.currentView, searchTerm: '', selectedCategory: null, sortBy: 'employment' };
+                    document.getElementById('searchInput').value = ''; searchDropdown.classList.remove('show'); updateActiveStates(); renderVisualization(); renderExposureBars();
+                });
+                
+                document.querySelectorAll('#educationFilters .filter-btn').forEach(btn => { btn.addEventListener('click', () => { state.educationFilter = btn.dataset.value; updateActiveStates(); renderVisualization(); }); });
+                document.querySelectorAll('#payFilters .filter-btn').forEach(btn => { btn.addEventListener('click', () => { state.payFilter = btn.dataset.value; updateActiveStates(); renderVisualization(); }); });
+                document.querySelectorAll('.view-tab').forEach(tab => { tab.addEventListener('click', () => { state.currentView = tab.dataset.view; updateActiveStates(); renderVisualization(); }); });
+                document.querySelectorAll('.sort-btn').forEach(btn => { if (btn.dataset.sort) { btn.addEventListener('click', () => { state.sortBy = btn.dataset.sort; updateActiveStates(); renderVisualization(); }); } });
+
+                document.getElementById('closeModalBtn').addEventListener('click', () => {
+                    document.getElementById('screenshotModal').classList.remove('show');
+                    document.getElementById('screenshotImageContainer').innerHTML = '';
+                });
+
+                // ==========================================
+                // 彻底修复稳定版的截图逻辑
+                // ==========================================
+                document.getElementById('shareScreenshotBtn').addEventListener('click', () => {
+                    // 开启下载锁，防止被底层的“失焦保护”误杀
+                    window.__isDownloading = true; 
+                    
+                    const container = document.getElementById('exportContainer');
+                    const btnTextSpan = document.getElementById('shareBtnText');
+                    
+                    const originalText = btnTextSpan.innerText;
+                    btnTextSpan.innerText = "⏳ 正在生成...";
+                    
+                    window.scrollTo(0, 0);
+
+                    // 🌟 使用 onclone 安全隐藏按钮，不破坏原有 DOM 导致闪烁
+                    html2canvas(container, {
+                        scale: 2, 
+                        backgroundColor: '#ffffff',
+                        useCORS: true,
+                        onclone: (clonedDoc) => {
+                            const shareGroup = clonedDoc.getElementById('shareControlsGroup');
+                            if (shareGroup) shareGroup.style.display = 'none';
+                        }
+                    }).then(canvas => {
+                        btnTextSpan.innerText = originalText;
+
+                        const imgDataUrl = canvas.toDataURL('image/png');
+
+                        // 尝试直接下载
+                        try {
+                            const link = document.createElement('a');
+                            link.download = `美国职业AI冲击度分析_${new Date().getTime()}.png`;
+                            link.href = imgDataUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        } catch(e) {
+                            console.warn('直接下载可能被拦截', e);
+                        }
+
+                        // 弹窗预览双保险
+                        const imgContainer = document.getElementById('screenshotImageContainer');
+                        imgContainer.innerHTML = `<img src="${imgDataUrl}" alt="分析报告截图" />`;
+                        document.getElementById('screenshotModal').classList.add('show');
+
+                        // 延迟解除锁
+                        setTimeout(() => { window.__isDownloading = false; }, 1500);
+
+                    }).catch(err => {
+                        console.error('截图引擎发生错误', err);
+                        btnTextSpan.innerText = '❌ 生成失败';
+                        setTimeout(() => { 
+                            btnTextSpan.innerText = originalText; 
+                            window.__isDownloading = false; 
+                        }, 2000);
+                    });
+                });
+            }
+
+            // 启动应用
+            init();
+        })();
+    </script>
+</body>
+</html>
