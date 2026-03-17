@@ -432,8 +432,12 @@
     </div>
 
     <script id="core-app-logic">
-        // 将整个初始化逻辑绑定到 load 事件，确保 D3 异步加载完毕后执行
-        window.addEventListener('load', function() {
+        // 核心应用启动逻辑抽取为独立函数
+        function startApp() {
+            // 防止重复启动
+            if (window.__appStarted) return;
+            window.__appStarted = true;
+
             // 核心数据
             const rawPackedData = [
                 "1|软件开发者|1876000|8.5|120990|bachelor|技术", "2|数据分析师|856000|8.2|78680|bachelor|技术", "3|市场分析师|736000|7.8|65680|bachelor|商业",
@@ -933,7 +937,20 @@
                     });
                 });
             }
-        });
+
+            init();
+        }
+
+        // 🌟 核心修复：彻底解决永久加载 bug (同时兼容 Canvas 预览环境和本地文件)
+        // 检查文档状态：如果是 'complete'，说明页面早已就绪，直接启动
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            startApp();
+        } else {
+            // 如果还没就绪，就监听普通的加载事件
+            window.addEventListener('DOMContentLoaded', startApp);
+            window.addEventListener('load', startApp);
+        }
+
     </script>
 </body>
 </html>
