@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Occupational Exposure - US Labor Market</title>
+    <!-- Async load D3.js and html2canvas -->
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #ffffff; --bg-secondary: #f8f9fa; --bg-tertiary: #e9ecef;
+            --text-primary: #212529; --text-secondary: #6c757d; --text-muted: #adb5bd;
+            --accent: #3498db; --accent-hover: #2980b9;
+            --exposure-0: #27ae60; --exposure-1: #2ecc71; --exposure-2: #f1c40f;
+            --exposure-3: #f39c12; --exposure-4: #e67e22; --exposure-5: #e74c3c;
+            --exposure-6: #c0392b; --exposure-7: #9b59b6; --exposure-8: #8e44ad;
+            --exposure-9: #7d3c98; --exposure-10: #6c3483;
+            --sidebar-width: 340px; --transition-speed: 0.3s;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-primary); color: var(--text-primary);
+            line-height: 1.6; height: 100vh; overflow: hidden;
+        }
+
+        /* Initial Loader */
+        #app-loader {
+            position: fixed; inset: 0; background: var(--bg-primary); z-index: 999999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.4s ease-out;
+        }
+        .loader-spinner {
+            width: 44px; height: 44px; border: 4px solid var(--bg-tertiary);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .container { display: flex; height: 100vh; transition: opacity 0.2s; }
+
+        /* Sidebar */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--bg-tertiary); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+        .sidebar-scroll { overflow-y: auto; flex: 1; height: 0; }
+        
+        .sidebar-scroll::-webkit-scrollbar, .sidebar::-webkit-scrollbar { width: 8px; }
+        .sidebar-scroll::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 4px; border: 1px solid var(--bg-secondary); }
+        
+        .sidebar-header { padding: 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-primary); flex-shrink: 0; }
+        .sidebar-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+        .sidebar-header p { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        .sidebar-header a { color: var(--accent); text-decoration: none; font-size: 12px; }
+
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; background: linear-gradient(135deg, #f8fafc 0%, #fff 100%); }
+        .stat-card { background: white; padding: 12px 6px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--bg-tertiary); }
+        .stat-value { font-size: 20px; font-weight: 800; font-family: "SF Mono", Monaco, monospace; background: linear-gradient(135deg, var(--accent) 0%, #2ecc71 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-value.highlight { background: linear-gradient(135deg, #e74c3c 0%, #f39c12 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-label { font-size: 10px; color: var(--text-secondary); margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Filters */
+        .search-section { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; position: relative; z-index: 100; }
+        .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--bg-tertiary); border-radius: 8px; font-size: 14px; outline: none; transition: all var(--transition-speed); font-family: inherit; }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); }
+        .search-dropdown { position: absolute; top: 100%; left: 24px; right: 24px; background: white; border: 1px solid var(--bg-tertiary); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; z-index: 1000; }
+        .search-dropdown.show { display: block; }
+        .search-dropdown-item { padding: 12px 14px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--bg-secondary); }
+        .search-dropdown-item:hover { background: var(--bg-secondary); }
+        .search-dropdown-item .color-bar { width: 6px; height: 24px; border-radius: 3px; flex-shrink: 0; }
+        .search-dropdown-item .job-title { flex: 1; font-size: 13px; font-weight: 500; }
+
+        .filter-section { padding: 20px 24px; border-bottom: 1px solid var(--bg-tertiary); }
+        .filter-section h3 { font-size: 11px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; letter-spacing: 0.8px; text-transform: uppercase; }
+        .exposure-bars { display: flex; gap: 3px; height: 60px; align-items: flex-end; }
+        .exposure-bar { flex: 1; background: var(--exposure-0); border-radius: 2px 2px 0 0; cursor: pointer; transition: all var(--transition-speed); min-height: 4px; }
+        .exposure-bar:hover { transform: scaleY(1.1); box-shadow: 0 -2px 8px rgba(0,0,0,0.15); }
+        .exposure-bar.active { box-shadow: 0 0 0 2px var(--text-primary); }
+        .exposure-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: var(--text-muted); }
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+        .filter-btn { padding: 6px 12px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 16px; font-size: 11px; cursor: pointer; transition: all var(--transition-speed); color: var(--text-secondary); }
+        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+        /* Main Content */
+        .main-content { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--bg-primary); display: flex; flex-direction: column; }
+        .view-tabs { display: flex; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); flex-shrink: 0; gap: 8px; overflow-x: auto; }
+        .view-tab { padding: 10px 20px; border: none; background: transparent; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all var(--transition-speed); border-radius: 6px; white-space: nowrap; }
+        .view-tab:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+        .view-tab.active { color: white; background: var(--accent); }
+
+        /* Chart Header */
+        .chart-header-wrapper { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .header-controls-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .sort-controls { display: flex; gap: 8px; align-items: center; }
+        .sort-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+        .sort-btn { padding: 4px 12px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 14px; font-size: 11px; cursor: pointer; color: var(--text-secondary); transition: all var(--transition-speed); display: inline-flex; align-items: center; gap: 4px; }
+        .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .sort-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .share-controls { display: flex; gap: 8px; margin-left: 8px; border-left: 1px solid var(--bg-tertiary); padding-left: 12px; }
+        .legend { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--bg-primary); border: 1px solid var(--bg-tertiary); border-radius: 20px; }
+        .legend-label { font-size: 10px; color: var(--text-secondary); font-weight: 500; }
+        .legend-gradient { width: 80px; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--exposure-0), var(--exposure-2), var(--exposure-5), var(--exposure-7), var(--exposure-10)); }
+
+        .category-sidebar-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); }
+        .category-sidebar-btn { padding: 4px 10px; border: 1px solid var(--bg-tertiary); background: var(--bg-primary); border-radius: 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
+        .category-sidebar-btn:hover, .category-sidebar-btn.active { border-color: var(--accent); color: var(--accent); }
+        .category-sidebar-btn.active { background: var(--accent); color: white; }
+        
+        .chart-container { padding: 24px 32px; flex: 1; }
+        .chart-title { font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; flex-wrap: wrap; }
+        .viz-container { width: 100%; min-height: 500px; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; position: relative; }
+
+        /* Visualization Views */
+        .grid-viz { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding: 20px; }
+        @media (max-width: 1600px) { .grid-viz { grid-template-columns: repeat(5, 1fr); } }
+        @media (max-width: 1400px) { .grid-viz { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 1100px) { .grid-viz { grid-template-columns: repeat(3, 1fr); } }
+        .grid-item { background: white; border-radius: 10px; padding: 14px; cursor: pointer; transition: all var(--transition-speed); display: flex; flex-direction: column; min-height: 110px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border: 2px solid transparent; }
+        .grid-item:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
+        .grid-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .grid-item-title { font-size: 12px; font-weight: 700; color: var(--text-primary); flex: 1; line-height: 1.2; }
+        .grid-item-badge { font-size: 15px; font-weight: 800; color: white; padding: 4px 6px; border-radius: 6px; min-width: 38px; text-align: center; }
+        .grid-item-stats { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+        .grid-item-stat { font-size: 10px; color: var(--text-secondary); }
+        .grid-item-stat span { font-weight: 600; color: var(--text-primary); }
+
+        .list-viz { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+        .list-item { background: white; border-radius: 8px; padding: 12px 18px; cursor: pointer; transition: all var(--transition-speed); display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 2px solid transparent; }
+        .list-item-color { width: 8px; height: 40px; border-radius: 4px; flex-shrink: 0; }
+        .list-item-info { flex: 1; min-width: 0; }
+        .list-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .list-item-meta { font-size: 11px; color: var(--text-secondary); }
+        .list-item-stats { display: flex; gap: 20px; flex-shrink: 0; }
+        .list-item-stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+        .list-item-stat-value { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+
+        /* View-specific container padding */
+        .proportion-viz, .trend-viz { padding: 20px; }
+        .proportion-category { margin-bottom: 24px; }
+        .proportion-category-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+        .proportion-category-count { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+        .proportion-bars { display: flex; flex-direction: column; gap: 8px; }
+        .proportion-bar-row { display: flex; align-items: center; gap: 12px; }
+        .proportion-label { width: 180px; font-size: 11px; color: var(--text-secondary); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .proportion-bar-track { flex: 1; height: 22px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; }
+        .proportion-bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; transition: width 0.5s; }
+        .proportion-bar-text { font-size: 10px; font-weight: 700; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        .proportion-value { width: 80px; font-size: 11px; color: var(--text-secondary); text-align: right; font-weight: 500; }
+
+        .trend-chart { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
+        .trend-row { display: flex; align-items: center; gap: 12px; }
+        .trend-label { width: 180px; font-size: 11px; color: var(--text-secondary); flex-shrink: 0; text-align: right; }
+        .trend-bar-container { flex: 1; height: 20px; background: var(--bg-tertiary); border-radius: 4px; position: relative; }
+        .trend-bar-center { position: absolute; left: 15%; top: 0; bottom: 0; width: 2px; background: var(--text-muted); }
+        .trend-bar { height: 16px; margin-top: 2px; border-radius: 3px; position: absolute; }
+        .trend-bar.positive { background: linear-gradient(90deg, #e74c3c 0%, #f39c12 100%); left: 15%; }
+        .trend-bar.negative { background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%); right: 85%; }
+        .trend-value { width: 65px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .trend-value.positive { color: #e74c3c; } .trend-value.negative { color: #27ae60; }
+
+        /* Mini Charts in Footer */
+        .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px 32px; border-top: 1px solid var(--bg-tertiary); background: var(--bg-secondary); flex-shrink: 0; }
+        .chart-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .chart-card h4 { font-size: 11px; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .bar-label { width: 110px; font-size: 9px; color: var(--text-secondary); font-weight: 500; }
+        .bar-track { flex: 1; height: 12px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .bar-value { width: 35px; font-size: 9px; color: var(--text-primary); text-align: right; font-weight: 700; }
+
+        /* Tooltip */
+        .tooltip { position: fixed; background: var(--text-primary); color: white; padding: 14px 18px; border-radius: 8px; font-size: 12px; pointer-events: none; z-index: 1000; opacity: 0; transition: opacity 0.15s; max-width: 280px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+        .tooltip.visible { opacity: 1; }
+        .tooltip-title { font-weight: 800; font-size: 14px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .tooltip-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+        .tooltip-label { color: rgba(255,255,255,0.7); font-weight: 500; }
+        .tooltip-value { font-weight: 700; }
+
+        /* Screenshot Modal */
+        .screenshot-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; padding: 20px; display: none;}
+        .screenshot-modal.show { opacity: 1; display: flex; }
+        .screenshot-content { background: white; border-radius: 12px; width: 100%; max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        .screenshot-header { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
+        .screenshot-header h3 { font-size: 15px; font-weight: 700; }
+        .screenshot-header-hint { font-size: 12px; color: #27ae60; background: rgba(39,174,96,0.1); padding: 4px 10px; border-radius: 4px; font-weight: 700; }
+        .screenshot-close-btn { background: var(--bg-tertiary); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .screenshot-body { flex: 1; overflow: auto; padding: 24px; background: #f1f3f5; display: flex; justify-content: center; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            body { height: auto; overflow: auto; }
+            .container { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; max-height: 55vh; border-right: none; border-bottom: 1px solid var(--bg-tertiary); display: block; overflow-y: auto; }
+            .sidebar-scroll { height: auto; overflow: visible; }
+            .main-content { flex: none; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .grid-viz { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px; }
+            .view-tabs { flex-wrap: wrap; padding: 12px 16px; }
+            .view-tab { flex: 1 1 calc(50% - 8px); text-align: center; font-size: 12px; padding: 8px; }
+            .proportion-label, .trend-label { width: 110px; font-size: 10px; }
+        }
+
+        .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-secondary); font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div id="app-loader">
+        <div class="loader-spinner"></div>
+        <h2 style="font-size: 16px; color: #2c3e50; margin-bottom: 8px; font-weight: 700;">Loading Analytics...</h2>
+        <p style="font-size: 12px; color: #7f8c8d;">Processing 342 occupation models</p>
+    </div>
+
+    <div class="container" id="mainAppContainer">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>AI Exposure of the US job Market</h1>
+                <p>By:  <a href="https://www.ebaogao.cn" target="_blank">ebaogao.cn</a> | Data: <a href="https://www.bls.gov/ooh/" target="_blank">US BLS</a></p>
+                <p>scored by Gemini | Flash: <a href="https://github.com/karpathy/jobs" target="_blank">Karpathy</a></p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="jobCount">0</div>
+                    <div class="stat-label">job Counts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalJobs">0</div>
+                    <div class="stat-label">Total jobs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value highlight" id="avgExposure">0</div>
+                    <div class="stat-label">Weighted avg. exposure</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-scroll">
+                <div class="search-section">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search occupation titles...">
+                    <div class="search-dropdown" id="searchDropdown"></div>
+                </div>
+                
+                <div class="category-sidebar-nav" id="sidebarCategoryNav"></div>
+                
+                <div class="filter-section">
+                    <h3>Exposure Level</h3>
+                    <div class="exposure-bars" id="exposureBars"></div>
+                    <div class="exposure-labels"><span>Low Exposure</span><span>High Exposure</span></div>
+                    <button class="filter-btn" id="clearFilter" style="margin-top: 12px; width: 100%; font-weight: 600;">Clear All Filters</button>
+                </div>
+                
+                <div class="filter-section">
+                    <h3>Education Filters</h3>
+                    <div class="filter-buttons" id="educationFilters">
+                        <button class="filter-btn active" data-value="all">All Levels</button>
+                        <button class="filter-btn" data-value="high">HS Diploma</button>
+                        <button class="filter-btn" data-value="some-college">Some College</button>
+                        <button class="filter-btn" data-value="associate">Associate's</button>
+                        <button class="filter-btn" data-value="bachelor">Bachelor's</button>
+                        <button class="filter-btn" data-value="master">Master's</button>
+                        <button class="filter-btn" data-value="doctoral">Doctoral</button>
+                        <button class="filter-btn" data-value="professional">Professional</button>
+                    </div>
+                </div>
+                
+                <div class="filter-section" style="padding-bottom: 30px;">
+                    <h3>Exposure by pay</h3>
+                    <div class="filter-buttons" id="payFilters">
+                        <button class="filter-btn active" data-value="all">All Ranges</button>
+                        <button class="filter-btn" data-value="low">&lt;$40k</button>
+                        <button class="filter-btn" data-value="medium">$40k-$80k</button>
+                        <button class="filter-btn" data-value="high">$80k-$120k</button>
+                        <button class="filter-btn" data-value="very-high">&gt;$120k</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="main-content">
+            <div class="view-tabs">
+                <button class="view-tab active" data-view="grid">Grid View</button>
+                <button class="view-tab" data-view="list">Detailed List</button>
+                <button class="view-tab" data-view="treemap">Treemap</button>
+                <button class="view-tab" data-view="proportion">Occupational Share</button>
+                <button class="view-tab" data-view="trend">Shift Analysis</button>
+            </div>
+            
+            <div id="exportContainer" style="background: var(--bg-primary); padding-bottom: 40px;">
+                <div class="chart-container">
+                    <div class="chart-header-wrapper">
+                        <div class="chart-title" id="chartTitle">Loading...</div>
+                        <div class="header-controls-group">
+                            <div class="legend" id="headerLegend">
+                                <span class="legend-label">Low</span>
+                                <div class="legend-gradient"></div>
+                                <span class="legend-label">High</span>
+                            </div>
+                            <div class="sort-controls" id="sortControls" style="display: none;">
+                                <span class="sort-label">Sort By:</span>
+                                <button class="sort-btn active" data-sort="employment">Employment ↓</button>
+                                <button class="sort-btn" data-sort="exposure">Exposure ↓</button>
+                            </div>
+                            <div class="share-controls">
+                                <button class="sort-btn" id="shareLinkBtn" style="background: var(--text-primary); color: white; border: none;">Copy URL</button>
+                                <button class="sort-btn" id="shareScreenshotBtn" style="background: var(--text-primary); color: white; border: none;">Export PNG</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="viz-container" id="vizContainer"></div>
+                </div>
+                
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h4>Breakdown</h4>
+                        <div id="exposureBreakdown"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Exposure by Pay</h4>
+                        <div id="exposureByPay"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Exposure by Education</h4>
+                        <div id="exposureByEducation"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-title" id="tooltipTitle"></div>
+        <div class="tooltip-row"><span class="tooltip-label">Employment</span><span class="tooltip-value" id="tooltipJobs"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">AI Exposure Score</span><span class="tooltip-value" id="tooltipExposure"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">Median Annual Wage</span><span class="tooltip-value" id="tooltipWage"></span></div>
+        <div class="tooltip-row"><span class="tooltip-label">Min. Education</span><span class="tooltip-value" id="tooltipEducation"></span></div>
+    </div>
+
+    <div class="screenshot-modal" id="screenshotModal">
+        <div class="screenshot-content">
+            <div class="screenshot-header">
+                <h3>📸 Export Result</h3>
+                <span class="screenshot-header-hint" id="screenshotHint">Long-press or right-click to save as image</span>
+                <button class="screenshot-close-btn" id="closeModalBtn">×</button>
+            </div>
+            <div class="screenshot-body" id="screenshotImageContainer"></div>
+        </div>
+    </div>
+
+    <script id="core-app-logic">
+        function startApp() {
+            if (window.__appStarted) return;
+            window.__appStarted = true;
+
+            const rawPackedData = [
+                "1|Software Developers|1876000|8.5|120990|bachelor|Technology", "2|Data Analysts|856000|8.2|78680|bachelor|Technology", "3|Marketing Analysts|736000|7.8|65680|bachelor|Business",
+                "4|Bookkeepers|1605000|7.5|42130|some-college|Finance", "5|Customer Service Reps|2855000|6.8|37060|high|Service", "6|Retail Salespersons|4350000|5.2|29840|high|Sales",
+                "7|Registered Nurses|3180000|4.8|77600|bachelor|Healthcare", "8|Elementary Teachers|6230000|6.2|62180|master|Education", "9|Electricians|697000|2.8|60120|high|Construction",
+                "10|Plumbers|480000|2.5|59120|high|Construction", "11|Construction Laborers|2340000|1.2|38040|high|Construction", "12|Janitors|2280000|0.8|30460|high|Service",
+                "13|Chefs|1465000|3.2|48120|some-college|Food Service", "14|Heavy Truck Drivers|3450000|3.5|47480|high|Transportation", "15|Physicians|713000|4.5|208000|professional|Healthcare",
+                "16|Lawyers|658000|5.8|126930|professional|Legal", "17|Accountants|1405000|7.2|78670|bachelor|Finance", "18|HR Specialists|1650000|6.5|65680|bachelor|Business",
+                "19|Writers|168000|8.8|69120|bachelor|Media", "20|Editors|122000|8.5|63120|bachelor|Media", "21|Reporters|55000|8.2|62180|bachelor|Media",
+                "22|Photographers|147000|7.5|41820|some-college|Media", "23|Graphic Designers|279000|7.8|53880|bachelor|Design", "24|Web Developers|162000|8.8|77800|bachelor|Technology",
+                "25|IT Support Specialists|875000|6.5|55240|some-college|Technology", "26|System Admins|366000|6.8|86620|bachelor|Technology", "27|Security Guards|1156000|2.2|31680|high|Service",
+                "28|Cashiers|3650000|5.5|27920|high|Sales", "29|Warehouse Workers|1205000|4.2|33640|high|Logistics", "30|Mech Engineers|312000|6.8|90420|bachelor|Engineering",
+                "31|Civil Engineers|306000|6.2|88420|bachelor|Engineering", "32|Elec Engineers|198000|6.8|103480|bachelor|Engineering", "33|Chem Engineers|33500|6.5|108540|bachelor|Engineering",
+                "34|Biomed Engineers|21200|7.2|97180|bachelor|Engineering", "35|Aero Engineers|58150|6.5|122270|bachelor|Engineering", "36|Env Engineers|55400|6.2|92620|bachelor|Engineering",
+                "37|Industrial Engineers|273000|6.5|86540|bachelor|Engineering", "38|Petro Engineers|38500|4.8|137330|bachelor|Engineering", "39|Geologists|33000|5.2|93120|bachelor|Science",
+                "40|Physicists|19000|6.5|134480|doctoral|Science", "41|Chemists|86600|6.8|79620|bachelor|Science", "42|Biologists|103000|6.5|82380|bachelor|Science",
+                "43|Lab Technicians|327000|5.8|53720|associate|Healthcare", "44|Radiologists|50600|7.2|218850|professional|Healthcare", "45|Pharmacists|315000|6.5|125610|professional|Healthcare",
+                "46|Dentists|146300|3.8|163220|professional|Healthcare", "47|Veterinarians|89500|4.2|100590|professional|Healthcare", "48|Psychiatrists|25500|4.5|220380|doctoral|Healthcare",
+                "49|Surgeons|51700|4.2|252990|professional|Healthcare", "50|Pediatricians|83700|4.5|198420|professional|Healthcare", "51|Physician Assistants|114700|4.8|214460|professional|Healthcare",
+                "52|Nurse Anesth.|64100|5.2|195610|master|Healthcare", "53|Physical Therapists|258000|4.5|91340|doctoral|Healthcare", "54|Occ Therapy Assts|143000|5.2|86240|master|Healthcare",
+                "55|Speech Pathologists|162000|5.5|79420|master|Healthcare", "56|Dental Hygienists|219000|4.8|77680|associate|Healthcare", "57|Medical Assistants|725000|5.8|36820|some-college|Healthcare",
+                "58|Pharmacy Technicians|415000|6.5|35940|some-college|Healthcare", "59|Project Managers|2235000|6.5|95120|bachelor|Management", "60|Operations Managers|2150000|6.2|98620|bachelor|Management",
+                "61|CEOs|218300|5.5|213480|bachelor|Management", "62|HR Managers|189500|6.8|126180|bachelor|Management", "63|Finance Managers|737000|6.5|156180|bachelor|Management",
+                "64|Marketing Managers|385000|6.8|140320|bachelor|Management", "65|Sales Managers|2085000|5.8|132290|bachelor|Sales", "66|Insurance Agents|408000|6.2|72980|high|Finance",
+                "67|Real Estate Agents|223420|5.5|52380|some-college|Finance", "68|Bank Tellers|435000|6.8|35120|high|Finance", "69|Loan Officers|275000|7.2|64280|some-college|Finance",
+                "70|Investment Analysts|108000|8.5|92480|bachelor|Finance", "71|Personal Financial Advisors|218000|7.5|94820|bachelor|Finance", "72|Stock Traders|45000|8.2|102660|bachelor|Finance",
+                "73|Risk Analysts|102000|7.8|102680|bachelor|Finance", "74|Actuaries|28000|7.2|111030|bachelor|Finance", "75|Procurement Clerks|578000|6.2|62420|bachelor|Business",
+                "76|Logistics Coordinators|1945000|5.5|45280|some-college|Logistics", "77|Supply Chain Analysts|136000|7.2|76280|bachelor|Business", "78|Wh Managers|156000|5.2|56280|some-college|Logistics",
+                "79|Couriers|892000|3.2|36280|high|Logistics", "80|Pilots|118000|4.5|198620|bachelor|Transportation", "81|Air Traffic Controllers|22700|4.8|128320|some-college|Transportation",
+                "82|Locomotive Engineers|41000|3.5|68280|some-college|Transportation", "83|Ship Captains|34500|3.2|98280|some-college|Transportation", "84|Waiters & Waitresses|2650000|3.8|26820|high|Food Service",
+                "85|Bartenders|637000|4.2|29320|high|Food Service", "86|Baristas|462000|4.5|28620|high|Food Service", "87|Cooks|5025000|3.5|24620|high|Food Service",
+                "88|Bakers|193000|4.2|30220|some-college|Food Service", "89|Dietitians|68000|5.5|61820|bachelor|Healthcare", "90|Fitness Trainers|395000|5.2|40220|some-college|Service",
+                "91|Beauticians|656000|3.8|36820|some-college|Service", "92|Barbers|237000|3.2|34220|some-college|Service", "93|Nannies|511000|2.2|28620|high|Service",
+                "94|Gardeners|891000|1.8|32620|high|Service", "95|Carpenters|895000|2.2|48220|high|Construction", "96|Painters|375000|1.8|42220|high|Construction",
+                "97|Masons|215000|1.5|45220|high|Construction", "98|Roofers|162000|0.8|43220|high|Construction", "99|HVAC Techs|372000|2.8|48220|some-college|Construction",
+                "100|Welders|414000|2.5|44220|some-college|Manufacturing", "101|Mechanics|767000|2.8|44220|some-college|Manufacturing", "102|Auto Techs|739000|3.2|44220|some-college|Manufacturing",
+                "103|Assemblers|1845000|3.8|34220|high|Manufacturing", "104|Machinists|2175000|3.5|36220|high|Manufacturing", "105|Inspectors|568000|4.5|38220|some-college|Manufacturing",
+                "106|Packers|981000|3.2|28220|high|Manufacturing", "107|Stock Clerks|1235000|3.5|30220|high|Logistics", "108|Forklift Ops|215000|3.2|35220|high|Logistics",
+                "109|Mail Carriers|335000|3.5|36220|high|Logistics", "110|Refuse Collectors|122000|1.2|38220|high|Service", "111|Social Workers|713000|4.8|52220|bachelor|Social Services",
+                "112|Counselors|178000|5.5|82220|master|Healthcare", "113|School Counselors|112000|5.8|58220|master|Education", "114|Preschool Teachers|2360000|4.2|36220|associate|Education",
+                "115|Elem Teachers|1325000|5.5|60220|bachelor|Education", "116|Middle School Teachers|1010000|5.8|62220|bachelor|Education", "117|High School Teachers|678000|5.5|64220|bachelor|Education",
+                "118|Special Ed Teachers|439000|5.2|62220|bachelor|Education", "119|Professors|136000|6.2|84220|doctoral|Education", "120|Librarians|118000|5.2|60220|bachelor|Media",
+                "121|Statisticians|34200|7.8|95220|master|Technology", "122|Data Scientists|98600|9.2|108220|bachelor|Technology", "123|ML Engineers|45600|9.5|130220|bachelor|Technology",
+                "124|AI Researchers|23500|9.8|145220|doctoral|Technology", "125|Cybersecurity Experts|163000|7.8|112220|bachelor|Technology", "126|DevOps Engineers|89500|8.5|118220|bachelor|Technology",
+                "127|Database Admins|168000|7.2|98220|bachelor|Technology", "128|Network Admins|258000|6.5|68220|some-college|Technology", "129|UI/UX Designers|198000|8.2|78220|bachelor|Design",
+                "130|Product Designers|156000|7.8|88220|bachelor|Design", "131|Architectural Designers|128000|6.8|82220|bachelor|Design", "132|Interior Designers|73500|6.5|58220|bachelor|Design",
+                "133|Paralegals|315000|8.2|52220|associate|Legal", "134|Judges|43500|4.2|148220|professional|Legal", "135|Sheriffs|105000|3.5|64220|high|Law Enforcement",
+                "136|Police Officers|808000|3.2|68220|some-college|Law Enforcement", "137|Detectives|103000|4.2|86220|some-college|Law Enforcement", "138|Firefighters|327000|1.8|52220|some-college|Law Enforcement",
+                "139|EMTs|265000|2.8|36220|some-college|Healthcare", "140|Optometrists|47500|5.2|152220|doctoral|Healthcare", "141|Hotel Desk Clerks|156000|4.8|28220|high|Service",
+                "142|Housekeepers|412000|2.5|24220|high|Service", "143|Event Planners|128000|6.2|52220|bachelor|Service", "144|Personal Assistants|385000|5.5|48220|some-college|Business",
+                "145|Admin Assistants|2150000|5.8|40220|some-college|Business", "146|Secretaries|2150000|5.2|38220|some-college|Business", "147|Data Entry Clerks|215000|6.5|34220|high|Business",
+                "148|Copywriters|185000|7.8|48220|bachelor|Media", "149|Content Ops|285000|7.5|52220|bachelor|Media", "150|Social Media Mgrs|215000|7.8|50220|bachelor|Media",
+                "151|SEO Specialists|85000|7.5|58220|some-college|Technology", "152|E-commerce Ops|285000|7.2|55220|bachelor|Business", "153|Purchasing Mgrs|218000|6.2|125220|bachelor|Business",
+                "154|Store Managers|2150000|4.5|45220|high|Sales", "155|Regional Managers|385000|5.8|85220|bachelor|Sales", "156|Telemarketers|1250000|6.5|32220|high|Sales",
+                "157|Technical Support|685000|6.8|52220|some-college|Technology", "158|Customer Success Mgrs|285000|6.2|65220|bachelor|Service", "159|Plant Managers|285000|5.2|105220|bachelor|Manufacturing",
+                "160|Prod Supervisors|685000|4.5|58220|some-college|Manufacturing", "161|Facility Managers|185000|5.2|98220|bachelor|Business", "162|Property Managers|215000|4.8|58220|some-college|Business",
+                "163|Auditors|185000|7.5|78220|bachelor|Finance", "164|Tax Specialists|215000|7.2|68220|bachelor|Finance", "165|Cashiers|685000|5.5|35220|high|Finance",
+                "166|HR Analysts|685000|6.8|62220|bachelor|Business", "167|Training Specialists|285000|6.2|58220|bachelor|Business", "168|Recruiters|385000|6.5|62220|bachelor|Business",
+                "169|Compliance Lawyers|85000|7.2|135220|professional|Legal", "170|IP Lawyers|45000|7.5|168220|professional|Legal", "171|Architects|128000|6.2|82220|bachelor|Design",
+                "172|Surveyors|45000|4.8|65220|bachelor|Construction", "173|Env Scientists|85000|6.5|76220|bachelor|Science", "174|Caregivers|2150000|3.2|28220|high|Healthcare",
+                "175|Home Health Aides|815000|3.5|25220|high|Healthcare", "176|Nurse Aides|1450000|3.2|30220|high|Healthcare", "177|Dental Assistants|315000|4.8|38220|some-college|Healthcare",
+                "178|Radiologic Techs|205000|5.8|65220|associate|Healthcare", "179|Resp Therapists|135000|5.2|65220|associate|Healthcare", "180|Medical Billers|186000|7.2|41620|some-college|Healthcare",
+                "181|Funeral Directors|35000|3.2|58220|associate|Service", "182|Marriage Therapists|71500|5.2|52220|master|Healthcare", "183|Corp Trainers|186000|5.8|62220|bachelor|Education",
+                "184|Registrars|189000|5.5|102220|master|Education", "185|Curators|13500|5.8|58220|master|Media", "186|Archaeologists|8500|5.5|66220|master|Science",
+                "187|Economists|21300|6.8|105220|bachelor|Business", "188|Game Developers|78500|8.8|78220|bachelor|Technology", "189|Landscape Architects|24500|5.8|70220|bachelor|Design",
+                "190|Fashion Designers|23500|6.8|77220|bachelor|Design", "191|Notaries Public|22500|4.8|48220|some-college|Legal", "192|Audiologists|14500|5.5|78220|doctoral|Healthcare",
+                "193|Podiatrists|10500|4.2|148220|professional|Healthcare", "194|Gym Managers|71500|5.5|54220|some-college|Service", "195|Concierges|28500|4.2|32220|high|Service",
+                "196|Travel Agents|78500|5.8|42220|some-college|Service", "197|Switchboard Ops|185000|4.8|35220|high|Business", "198|Proofreaders|25000|7.5|42220|bachelor|Media",
+                "199|SEM Specialists|45000|7.8|62220|some-college|Technology", "200|Channel Managers|285000|6.2|95220|bachelor|Sales", "201|Maint. Supervisors|185000|3.5|68220|some-college|Manufacturing",
+                "202|Appraisers|65000|6.5|58220|bachelor|Finance", "203|Payroll Specialists|185000|6.8|48220|some-college|Finance", "204|Collectors|285000|5.8|38220|high|Finance",
+                "205|Credit Analysts|115000|7.2|68220|bachelor|Finance", "206|Underwriters|85000|6.5|70220|bachelor|Finance", "207|Claims Adjusters|315000|6.2|48220|some-college|Finance",
+                "208|Employee Relations|115000|6.2|68220|bachelor|Business", "209|Comp & Benefits|145000|6.5|68220|bachelor|Business", "210|Compliance Spec|215000|6.8|72220|bachelor|Business",
+                "211|Legal Assistants|185000|7.5|58220|associate|Legal", "212|Defense Lawyers|65000|5.5|98220|professional|Legal", "213|Family Lawyers|55000|5.2|85220|professional|Legal",
+                "214|Real Estate Lawyers|45000|6.2|125220|professional|Legal", "215|Drafters|65000|5.8|48220|associate|Design", "216|Land Planners|35000|5.5|78220|master|Construction",
+                "217|Urban Designers|15000|6.2|85220|master|Design", "218|Env Technicians|75000|5.8|48220|associate|Science", "219|Hydrologists|6500|5.5|85220|bachelor|Science",
+                "220|Oceanographers|18500|5.8|95220|bachelor|Science", "221|Meteorologists|10500|6.2|95220|bachelor|Science", "222|Microbiologists|18500|6.5|85220|bachelor|Science",
+                "223|Geneticists|4500|7.2|105220|doctoral|Science", "224|Neuroscientists|5500|7.5|115220|doctoral|Science", "225|Pharmacologists|3500|7.2|125220|doctoral|Science",
+                "226|Agronomists|15000|4.8|65220|bachelor|Science", "227|Food Scientists|15000|5.5|75220|bachelor|Science", "228|Foresters|8500|4.5|65220|bachelor|Science",
+                "229|Vet Techs|95000|4.2|35220|associate|Healthcare", "230|Animal Caretakers|235000|3.5|28220|high|Service", "231|Animal Trainers|18500|4.2|35220|some-college|Service",
+                "232|Personal Trainers|185000|4.8|45220|some-college|Service", "233|Massage Therapists|185000|3.8|45220|some-college|Service", "234|Pharmacy Dispensers|145000|6.2|35220|some-college|Healthcare",
+                "235|Opticians|65000|5.2|45220|associate|Healthcare", "236|Oral Hygienists|185000|4.5|58220|associate|Healthcare", "237|Chiropractors|45000|4.2|75220|professional|Healthcare",
+                "238|PT Assistants|95000|4.8|45220|associate|Healthcare", "239|Dialysis Techs|65000|5.5|55220|some-college|Healthcare", "240|Sonographers|85000|5.8|78220|associate|Healthcare",
+                "241|Medical Coders|185000|7.2|45220|some-college|Healthcare", "242|Health Info Mgrs|115000|6.5|55220|associate|Healthcare", "243|Hospital Admins|185000|5.8|125220|master|Healthcare",
+                "244|Mountain Guides|5500|2.5|38220|high|Service", "245|Ski Instructors|45000|3.2|35220|high|Service", "246|Golf Caddies|35000|2.2|25220|high|Service",
+                "247|Anthropologists|8200|5.8|66220|master|Science", "248|Sociologists|5500|6.2|58220|master|Science", "249|InfoSec Mgrs|112000|7.5|105220|bachelor|Technology",
+                "250|Computer Support|585000|6.2|48220|some-college|Technology", "251|Elevator Installers|23500|2.5|98220|some-college|Construction", "252|Boilermakers|32800|2.2|60220|some-college|Construction",
+                "253|Sheet Metal Workers|142000|2.5|44220|some-college|Manufacturing", "254|Elevator Ops|21500|2.8|55220|high|Construction", "255|Stonemasons|48500|1.5|48220|high|Construction",
+                "256|Pipefitters|480000|2.5|59120|high|Construction", "257|Electricians|697000|2.8|60120|high|Construction", "258|Brickmasons|215000|1.5|45220|high|Construction",
+                "259|Glaziers|45000|2.2|45220|high|Construction", "260|Concrete Finishers|235000|1.8|42220|high|Construction", "261|Insulators|78000|2.2|45220|high|Construction",
+                "262|Drywallers|156000|1.8|43220|high|Construction", "263|Carpenters|895000|2.2|48220|high|Construction", "264|Roofers|162000|0.8|43220|high|Construction",
+                "265|Plasterers|145000|1.5|45220|high|Construction", "266|Renovators|285000|2.5|48220|high|Construction", "267|Landscape Designers|24500|5.8|70220|bachelor|Design",
+                "268|Urban Planners|38500|5.5|78220|master|Construction", "269|Surveying Techs|45000|4.8|65220|bachelor|Construction", "270|Civil Eng Techs|215000|5.5|58220|associate|Engineering",
+                "271|Elec Eng Techs|185000|5.8|62220|associate|Engineering", "272|Mech Eng Techs|165000|5.5|58220|associate|Engineering", "273|Aero Eng Techs|125000|5.2|72220|associate|Engineering",
+                "274|Bio Technicians|45000|6.2|48220|associate|Science", "275|Chem Technicians|65000|6.5|52220|associate|Science", "276|Env Samplers|85000|4.5|45220|associate|Science",
+                "277|Petro Geologists|35000|4.5|125220|bachelor|Science", "278|Mining Engineers|6000|4.2|93420|bachelor|Engineering", "279|Agri Engineers|2350|4.5|80280|bachelor|Engineering",
+                "280|Nuclear Engineers|18500|5.5|115220|bachelor|Engineering", "281|Materials Engineers|28500|6.2|95220|bachelor|Engineering", "282|Quality Engineers|185000|6.5|75220|bachelor|Manufacturing",
+                "283|Safety Engineers|95000|5.8|85220|bachelor|Manufacturing", "284|Mfg Engineers|125000|6.2|75220|bachelor|Manufacturing", "285|Process Engineers|75000|6.5|78220|bachelor|Manufacturing",
+                "286|Millwrights|385000|2.8|48220|some-college|Manufacturing", "287|Equipment Maint|425000|3.2|44220|high|Manufacturing", "288|Elevator Maint|23500|2.5|68220|some-college|Construction",
+                "289|HVAC Maint|385000|2.8|50220|some-college|Construction", "290|Electrical Maint|215000|2.8|55220|some-college|Construction", "291|Plumbing Maint|185000|2.5|52220|some-college|Construction",
+                "292|Auto Mechanics|765000|3.2|44220|some-college|Manufacturing", "293|Motorcycle Techs|85000|3.5|42220|some-college|Manufacturing", "294|Heavy Equip Ops|215000|3.2|48220|high|Manufacturing",
+                "295|Crane Operators|55000|3.5|55220|some-college|Manufacturing", "296|Bulldozer Ops|65000|2.8|48220|high|Manufacturing", "297|Excavator Ops|85000|2.8|48220|high|Manufacturing",
+                "298|Truck Drivers|2150000|3.2|48220|high|Transportation", "299|Bus Drivers|685000|3.5|45220|high|Transportation", "300|Taxi Drivers|385000|3.8|35220|high|Transportation",
+                "301|Ambulance Drivers|85000|2.5|38220|high|Healthcare", "302|Railroad Workers|45000|3.2|55220|high|Transportation", "303|Railroad Engineers|35000|3.5|68220|some-college|Transportation",
+                "304|Airline Pilots|118000|4.5|198620|bachelor|Transportation", "305|Co-Pilots|85000|5.2|145220|bachelor|Transportation", "306|Flight Attendants|385000|4.5|52220|some-college|Transportation",
+                "307|Ground Crew|185000|4.2|42220|high|Transportation", "308|Aircraft Mechanics|125000|3.5|65220|some-college|Manufacturing", "309|Avionics Techs|45000|5.2|75220|associate|Technology",
+                "310|Ship Captains|34500|3.2|98280|some-college|Transportation", "311|First Mates|25000|3.5|75220|some-college|Transportation", "312|Second Mates|18500|4.2|65220|some-college|Transportation",
+                "313|Marine Engineers|18500|3.2|85220|some-college|Transportation", "314|Sailors|45000|3.5|42220|high|Transportation", "315|Stevedores|125000|3.2|38220|high|Logistics",
+                "316|Wh Workers|1205000|4.2|33640|high|Logistics", "317|Packaging Workers|981000|3.2|28220|high|Manufacturing", "318|Sorters|685000|3.5|30220|high|Logistics",
+                "319|Delivery Drivers|1250000|3.8|35220|high|Logistics", "320|Postal Clerks|485000|3.5|36220|high|Logistics", "321|Garbage Truck Drivers|85000|2.2|38220|high|Service",
+                "322|Sanitation Workers|285000|1.5|32220|high|Service", "323|Drain Cleaners|45000|2.2|38220|high|Service", "324|Pool Maintenance|35000|2.5|35220|high|Service",
+                "325|Pest Control|65000|2.8|38220|high|Service", "326|Carpet Cleaners|85000|2.2|30220|high|Service", "327|Laundry Workers|185000|2.5|28220|high|Service",
+                "328|Dry Cleaners|75000|2.8|30220|high|Service", "329|Tailors|45000|3.5|35220|high|Manufacturing", "330|Shoemakers|25000|3.2|32220|high|Manufacturing",
+                "331|Cutters|85000|3.5|35220|high|Manufacturing", "332|Sewers|165000|3.2|30220|high|Manufacturing", "333|Printers|45000|3.8|38220|high|Manufacturing",
+                "334|Binders|25000|3.5|35220|high|Manufacturing", "335|Prepress Techs|15000|4.2|45220|some-college|Manufacturing", "336|Gemologists|8500|5.5|55220|some-college|Manufacturing",
+                "337|Watchmakers|15000|3.2|45220|some-college|Manufacturing", "338|Dental Techs|35000|4.5|48220|associate|Healthcare", "339|Optometric Assts|45000|5.2|38220|associate|Healthcare",
+                "340|Nurse Anesthetists|65000|5.5|125220|master|Healthcare", "341|Midwives|7300|4.8|105030|master|Healthcare", "342|Medical Transcriptionists|55000|9.2|35220|some-college|Healthcare"
+            ];
+
+            const occupations = rawPackedData.map(str => {
+                const parts = str.split('|');
+                return { id: parseInt(parts[0]), title: parts[1], employment: parseInt(parts[2]), exposure: parseFloat(parts[3]), wage: parseInt(parts[4]), education: parts[5], category: parts[6] };
+            });
+
+            let state = { selectedExposure: null, educationFilter: 'all', payFilter: 'all', currentView: 'grid', searchTerm: '', selectedCategory: null, sortBy: 'employment' };
+            const tooltip = document.getElementById('tooltip');
+            const vizContainer = document.getElementById('vizContainer');
+            const searchDropdown = document.getElementById('searchDropdown');
+
+            function init() {
+                renderSidebarCategories(); 
+                renderExposureBars();
+                renderVisualization();
+                setupEventListeners();
+                const loader = document.getElementById('app-loader');
+                if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.parentNode?.removeChild(loader), 400); }
+            }
+
+            function getExposureColor(exposure) {
+                const colors = ['#27ae60','#2ecc71','#f1c40f','#f39c12','#e67e22','#e74c3c','#c0392b','#9b59b6','#8e44ad','#7d3c98','#6c3483'];
+                return colors[Math.min(Math.floor(exposure), 10)];
+            }
+
+            function getEducationLabel(edu) {
+                const labels = { 'high': 'HS Diploma', 'some-college': 'Some College', 'associate': 'Associate\'s', 'bachelor': 'Bachelor\'s', 'master': 'Master\'s', 'doctoral': 'Doctoral', 'professional': 'Professional' };
+                return labels[edu] || edu;
+            }
+
+            function formatNumber(num) {
+                if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+                if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
+                return num.toLocaleString();
+            }
+
+            function getFilteredOccupations() {
+                return occupations.filter(job => {
+                    if (state.searchTerm && !job.title.toLowerCase().includes(state.searchTerm.toLowerCase())) return false;
+                    if (state.selectedExposure !== null && Math.round(job.exposure) !== state.selectedExposure) return false;
+                    if (state.educationFilter !== 'all' && job.education !== state.educationFilter) return false;
+                    if (state.payFilter !== 'all') {
+                        if (state.payFilter === 'low' && job.wage >= 40000) return false;
+                        if (state.payFilter === 'medium' && (job.wage < 40000 || job.wage >= 80000)) return false;
+                        if (state.payFilter === 'high' && (job.wage < 80000 || job.wage >= 120000)) return false;
+                        if (state.payFilter === 'very-high' && job.wage < 120000) return false;
+                    }
+                    if (state.selectedCategory && job.category !== state.selectedCategory) return false;
+                    return true;
+                });
+            }
+
+            function renderSidebarCategories() {
+                const container = document.getElementById('sidebarCategoryNav');
+                const categories = [...new Set(occupations.map(j => j.category))].sort();
+                let html = `<button class="category-sidebar-btn active" data-category="all">All Sectors</button>`;
+                categories.forEach(cat => html += `<button class="category-sidebar-btn" data-category="${cat}">${cat}</button>`);
+                container.innerHTML = html;
+                container.querySelectorAll('.category-sidebar-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.selectedCategory = btn.dataset.category === 'all' ? null : btn.dataset.category;
+                        updateActiveStates(); renderVisualization(); renderExposureBars();
+                    });
+                });
+            }
+
+            function renderExposureBars() {
+                const container = document.getElementById('exposureBars');
+                const distribution = {}; for (let i = 0; i <= 10; i++) distribution[i] = 0;
+                getFilteredOccupations().forEach(job => distribution[Math.round(job.exposure)]++);
+                container.innerHTML = '';
+                const maxCount = Math.max(...Object.values(distribution));
+                for (let i = 0; i <= 10; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'exposure-bar'; bar.dataset.range = i;
+                    bar.style.height = `${maxCount > 0 ? (distribution[i] / maxCount) * 100 : 5}%`;
+                    bar.addEventListener('click', () => {
+                        state.selectedExposure = state.selectedExposure === i ? null : i;
+                        updateActiveStates(); renderVisualization();
+                    });
+                    container.appendChild(bar);
+                }
+            }
+
+            function updateActiveStates() {
+                document.querySelectorAll('.exposure-bar').forEach(bar => bar.classList.toggle('active', parseInt(bar.dataset.range) === state.selectedExposure));
+                document.querySelectorAll('.view-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.view === state.currentView));
+                document.querySelectorAll('.category-sidebar-btn').forEach(btn => btn.classList.toggle('active', (btn.dataset.category === 'all' && !state.selectedCategory) || (btn.dataset.category === state.selectedCategory)));
+                document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.sort === state.sortBy));
+                document.querySelectorAll('#educationFilters .filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.value === state.educationFilter));
+                document.querySelectorAll('#payFilters .filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.value === state.payFilter));
+            }
+
+            function renderVisualization() {
+                let filtered = getFilteredOccupations();
+                if (state.sortBy === 'employment') filtered.sort((a, b) => b.employment - a.employment);
+                else if (state.sortBy === 'exposure') filtered.sort((a, b) => b.exposure - a.exposure);
+
+                vizContainer.innerHTML = '';
+                const titles = { 'grid': 'AI Exposure by Occupation', 'list': 'Impact Ranking Detailed List', 'treemap': 'Labor Market Hierarchical Treemap', 'proportion': 'Occupational Market Share', 'trend': '2025 AI Shift Analysis' };
+                
+                document.getElementById('chartTitle').innerHTML = `
+                    <span style="flex:1">${titles[state.currentView]} (${filtered.length} Occupations)</span>
+                    <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:12px; display:inline-flex; align-items:center; opacity:0.9; transition:opacity 0.2s">
+                        <img src="ebaobao-logo.png" style="height:22px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                        <span style="display:none; color:var(--accent); font-weight:900; font-size:14px; letter-spacing:-0.5px">ebaobao</span>
+                    </a>`;
+
+                document.getElementById('sortControls').style.display = (['grid', 'list'].includes(state.currentView)) ? 'flex' : 'none';
+
+                if (state.currentView === 'grid') renderGridView(filtered);
+                else if (state.currentView === 'list') renderListView(filtered);
+                else if (state.currentView === 'treemap') renderTreemapView(filtered);
+                else if (state.currentView === 'proportion') renderProportionView(filtered);
+                else if (state.currentView === 'trend') renderTrendView(filtered);
+
+                updateStats(filtered); renderCharts(filtered);
+            }
+
+            function renderGridView(jobs) {
+                const container = document.createElement('div'); container.className = 'grid-viz';
+                jobs.forEach(job => {
+                    const item = document.createElement('div'); item.className = 'grid-item'; item.style.borderColor = getExposureColor(job.exposure);
+                    item.innerHTML = `<div class="grid-item-header"><div class="grid-item-title">${job.title}</div><div class="grid-item-badge" style="background:${getExposureColor(job.exposure)}">${job.exposure.toFixed(1)}</div></div><div class="grid-item-stats"><div class="grid-item-stat">Employment: <span>${formatNumber(job.employment)}</span></div><div class="grid-item-stat">Wage: <span>$${formatNumber(job.wage)}</span></div></div>`;
+                    item.addEventListener('mouseenter', e => showTooltip(e, job)); item.addEventListener('mousemove', moveTooltip); item.addEventListener('mouseleave', hideTooltip);
+                    container.appendChild(item);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderListView(jobs) {
+                const container = document.createElement('div'); container.className = 'list-viz';
+                jobs.forEach(job => {
+                    const item = document.createElement('div'); item.className = 'list-item'; item.style.borderColor = getExposureColor(job.exposure);
+                    item.innerHTML = `<div class="list-item-color" style="background:${getExposureColor(job.exposure)}"></div><div class="list-item-info"><div class="list-item-title">${job.title}</div><div class="list-item-meta">${job.category} • ${getEducationLabel(job.education)}</div></div><div class="list-item-stats"><div class="list-item-stat"><div class="list-item-stat-label">Employment</div><div class="list-item-stat-value">${formatNumber(job.employment)}</div></div><div class="list-item-stat"><div class="list-item-stat-label">Exposure</div><div class="list-item-stat-value" style="color:${getExposureColor(job.exposure)}">${job.exposure.toFixed(1)}</div></div><div class="list-item-stat"><div class="list-item-stat-label">Wage</div><div class="list-item-stat-value">$${formatNumber(job.wage)}</div></div></div>`;
+                    item.addEventListener('mouseenter', e => showTooltip(e, job)); item.addEventListener('mousemove', moveTooltip); item.addEventListener('mouseleave', hideTooltip);
+                    container.appendChild(item);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderTreemapView(jobs) {
+                const container = document.createElement('div');
+                container.style.width = '100%'; container.style.height = '600px'; container.style.position = 'relative';
+                vizContainer.appendChild(container);
+
+                if (!window.d3) return;
+                const width = container.clientWidth; const height = 600;
+                const root = d3.hierarchy({ children: jobs }).sum(d => d.employment).sort((a, b) => b.value - a.value);
+                d3.treemap().size([width, height]).paddingInner(2).round(true)(root);
+
+                const svg = d3.select(container).append("svg").attr("width", width).attr("height", height).style("font-family", "inherit");
+                const leaf = svg.selectAll("g").data(root.leaves()).join("g").attr("transform", d => `translate(${d.x0},${d.y0})`);
+
+                leaf.append("rect").attr("width", d => Math.max(0, d.x1 - d.x0)).attr("height", d => Math.max(0, d.y1 - d.y0)).attr("fill", d => getExposureColor(d.data.exposure)).attr("rx", 3)
+                    .on("mouseenter", (e, d) => showTooltip(e, d.data)).on("mousemove", moveTooltip).on("mouseleave", hideTooltip);
+                
+                leaf.append("text").attr("x", 4).attr("y", 14).attr("fill", "white").style("font-size", "10px").style("font-weight", "600").text(d => (d.x1 - d.x0 > 50) ? d.data.title : "");
+            }
+
+            function renderProportionView(jobs) {
+                const container = document.createElement('div'); container.className = 'proportion-viz';
+                const total = jobs.reduce((s, j) => s + j.employment, 0);
+                const grouped = {}; jobs.forEach(j => { if(!grouped[j.category]) grouped[j.category] = []; grouped[j.category].push(j); });
+                
+                Object.entries(grouped).sort().forEach(([cat, items]) => {
+                    const catTotal = items.reduce((s, j) => s + j.employment, 0);
+                    const div = document.createElement('div'); div.className = 'proportion-category';
+                    div.innerHTML = `<div class="proportion-category-title">${cat} <span class="proportion-category-count">${formatNumber(catTotal)} Employment (${((catTotal/total)*100).toFixed(1)}%)</span></div>`;
+                    const bars = document.createElement('div'); bars.className = 'proportion-bars';
+                    items.sort((a,b) => b.employment - a.employment).forEach(j => {
+                        const pct = (j.employment / catTotal * 100).toFixed(1);
+                        bars.innerHTML += `<div class="proportion-bar-row"><div class="proportion-label">${j.title}</div><div class="proportion-bar-track"><div class="proportion-bar-fill" style="width:${pct}%;background:${getExposureColor(j.exposure)}"><span class="proportion-bar-text">${pct}%</span></div></div><div class="proportion-value">${formatNumber(j.employment)}</div></div>`;
+                    });
+                    div.appendChild(bars); container.appendChild(div);
+                });
+                vizContainer.appendChild(container);
+            }
+
+            function renderTrendView(jobs) {
+                const container = document.createElement('div'); container.className = 'trend-viz';
+                const chart = document.createElement('div'); chart.className = 'trend-chart';
+                jobs.map(j => ({ ...j, change: (j.exposure * 0.08 - 0.05) * 100 })).sort((a,b) => b.change - a.change).forEach(j => {
+                    const isPos = j.change >= 0;
+                    chart.innerHTML += `<div class="trend-row"><div class="trend-label">${j.title}</div><div class="trend-bar-container"><div class="trend-bar-center"></div><div class="trend-bar ${isPos?'positive':'negative'}" style="width:${Math.abs(j.change)*5}%"></div></div><div class="trend-value ${isPos?'positive':'negative'}">${isPos?'+':''}${j.change.toFixed(1)}%</div></div>`;
+                });
+                container.appendChild(chart); vizContainer.appendChild(container);
+            }
+
+            function updateStats(jobs) {
+                const total = jobs.reduce((s, j) => s + j.employment, 0);
+                const weighted = jobs.reduce((s, j) => s + j.exposure * j.employment, 0);
+                const avg = total > 0 ? (weighted / total).toFixed(1) : 0;
+                document.getElementById('jobCount').textContent = jobs.length;
+                document.getElementById('totalJobs').textContent = formatNumber(total);
+                document.getElementById('avgExposure').textContent = avg;
+            }
+
+            function renderCharts(jobs) {
+                const breakdown = document.getElementById('exposureBreakdown');
+                const ranges = [['Very Low',0,1],['Low',2,3],['Moderate',4,5],['High',6,7],['Critical',8,10]];
+                breakdown.innerHTML = ranges.map(r => {
+                    const count = jobs.filter(j => Math.round(j.exposure) >= r[1] && Math.round(j.exposure) <= r[2]).length;
+                    const pct = jobs.length > 0 ? (count / jobs.length * 100).toFixed(1) : 0;
+                    return `<div class="bar-row"><div class="bar-label">${r[0]}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${getExposureColor(r[1]+1)}"></div></div><div class="bar-value">${pct}%</div></div>`;
+                }).join('');
+
+                const payRanges = document.getElementById('exposureByPay');
+                const payLevels = [['< $40k',0,40000],['$40k-$80k',40000,80000],['$80k-$120k',80000,120000],['> $120k',120000,Infinity]];
+                payRanges.innerHTML = payLevels.map(p => {
+                    const group = jobs.filter(j => j.wage >= p[1] && j.wage < p[2]);
+                    const avg = group.length > 0 ? (group.reduce((s,j)=>s+j.exposure,0)/group.length) : 0;
+                    return `<div class="bar-row"><div class="bar-label">${p[0]}</div><div class="bar-track"><div class="bar-fill" style="width:${avg*10}%;background:${getExposureColor(avg)}"></div></div><div class="bar-value" style="color:${getExposureColor(avg)}">${avg.toFixed(1)}</div></div>`;
+                }).join('');
+
+                const eduCharts = document.getElementById('exposureByEducation');
+                const eduLevels = [['HS Diploma','high'],['Bachelor\'s','bachelor'],['Master\'s','master'],['Post-Grad','doctoral','professional']];
+                eduCharts.innerHTML = eduLevels.map(e => {
+                    const group = jobs.filter(j => e.slice(1).includes(j.education));
+                    const avg = group.length > 0 ? (group.reduce((s,j)=>s+j.exposure,0)/group.length) : 0;
+                    return `<div class="bar-row"><div class="bar-label">${e[0]}</div><div class="bar-track"><div class="bar-fill" style="width:${avg*10}%;background:${getExposureColor(avg)}"></div></div><div class="bar-value" style="color:${getExposureColor(avg)}">${avg.toFixed(1)}</div></div>`;
+                }).join('');
+            }
+
+            function showTooltip(e, job) {
+                document.getElementById('tooltipTitle').textContent = job.title;
+                document.getElementById('tooltipJobs').textContent = job.employment.toLocaleString();
+                document.getElementById('tooltipExposure').textContent = job.exposure.toFixed(1) + '/10';
+                document.getElementById('tooltipWage').textContent = '$' + job.wage.toLocaleString();
+                document.getElementById('tooltipEducation').textContent = getEducationLabel(job.education);
+                tooltip.classList.add('visible'); moveTooltip(e);
+            }
+
+            function moveTooltip(e) { tooltip.style.left = `${Math.min(e.clientX + 15, window.innerWidth - 300)}px`; tooltip.style.top = `${Math.min(e.clientY + 15, window.innerHeight - 200)}px`; }
+            function hideTooltip() { tooltip.classList.remove('visible'); }
+
+            function setupEventListeners() {
+                document.getElementById('searchInput').addEventListener('input', e => { state.searchTerm = e.target.value; renderVisualization(); });
+                document.querySelectorAll('.view-tab').forEach(t => t.addEventListener('click', () => { state.currentView = t.dataset.view; updateActiveStates(); renderVisualization(); }));
+                document.getElementById('clearFilter').addEventListener('click', () => { state = { ...state, searchTerm: '', selectedExposure: null, educationFilter: 'all', payFilter: 'all', selectedCategory: null }; document.getElementById('searchInput').value = ''; updateActiveStates(); renderVisualization(); renderExposureBars(); });
+                document.querySelectorAll('#educationFilters .filter-btn').forEach(btn => btn.addEventListener('click', () => { state.educationFilter = btn.dataset.value; updateActiveStates(); renderVisualization(); }));
+                document.querySelectorAll('#payFilters .filter-btn').forEach(btn => btn.addEventListener('click', () => { state.payFilter = btn.dataset.value; updateActiveStates(); renderVisualization(); }));
+                document.querySelectorAll('.sort-btn').forEach(btn => btn.addEventListener('click', () => { if(btn.dataset.sort) { state.sortBy = btn.dataset.sort; updateActiveStates(); renderVisualization(); } }));
+
+                document.getElementById('shareLinkBtn').addEventListener('click', () => { navigator.clipboard.writeText(window.location.href); alert('Dashboard URL copied to clipboard!'); });
+                document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('screenshotModal').classList.remove('show'));
+                document.getElementById('shareScreenshotBtn').addEventListener('click', async () => {
+                    const btn = document.getElementById('shareScreenshotBtn');
+                    const origText = btn.innerText;
+                    btn.innerText = "Processing...";
+                    try {
+                        const canvas = await html2canvas(document.getElementById('exportContainer'), { scale: 2, useCORS: true });
+                        document.getElementById('screenshotImageContainer').innerHTML = `<img src="${canvas.toDataURL()}" style="max-width:100%; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">`;
+                        document.getElementById('screenshotModal').classList.add('show');
+                    } catch(e) { console.error(e); alert('Export failed. Check console.'); }
+                    btn.innerText = origText;
+                });
+            }
+
+            init();
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') startApp();
+        else window.addEventListener('DOMContentLoaded', startApp);
+    </script>
+</body>
+</html>
