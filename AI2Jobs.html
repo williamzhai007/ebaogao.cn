@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>美国就业市场AI冲击程度分析</title>
-    <!-- 引入 D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- 引入 html2canvas 确保截图可用 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入 D3.js，添加 defer 异步加载，防止白屏阻塞 -->
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <!-- 引入 html2canvas 确保截图可用，添加 defer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -26,6 +26,19 @@
             background: var(--bg-primary); color: var(--text-primary);
             line-height: 1.6; height: 100vh; overflow: hidden;
         }
+
+        /* 首次加载的动画遮罩 */
+        #app-loader {
+            position: fixed; inset: 0; background: var(--bg-primary); z-index: 999999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.4s ease-out;
+        }
+        .loader-spinner {
+            width: 44px; height: 44px; border: 4px solid var(--bg-tertiary);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
         .container { display: flex; height: 100vh; transition: opacity 0.2s; }
 
@@ -171,6 +184,17 @@
         .tooltip-label { color: rgba(255,255,255,0.7); }
         .tooltip-value { font-weight: 600; }
 
+        /* 截图预览弹窗 (PC端默认) */
+        .screenshot-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; padding: 20px; }
+        .screenshot-modal.show { opacity: 1; pointer-events: auto; }
+        .screenshot-content { background: white; border-radius: 12px; width: 100%; max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
+        .screenshot-header { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
+        .screenshot-header h3 { font-size: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .screenshot-header-hint { font-size: 13px; color: #27ae60; font-weight: 600; background: rgba(39, 174, 96, 0.1); padding: 6px 12px; border-radius: 6px; }
+        .screenshot-close-btn { background: var(--bg-tertiary); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .screenshot-body { flex: 1; overflow: auto; padding: 24px; background: #f1f3f5; display: flex; justify-content: center; }
+        .screenshot-body img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
         /* 移动端重磅优化 */
         @media (max-width: 768px) {
             body { height: auto; overflow: auto; }
@@ -233,24 +257,32 @@
             .legend-gradient { width: 60px; }
             .legend { padding: 4px 8px; gap: 4px; }
             .share-controls { margin-left: 0; border-left: none; padding-left: 0; flex-wrap: wrap; }
+
+            /* 🌟 手机端专门压缩截图弹窗的头部空间，防止横向拥挤 */
+            .screenshot-modal { padding: 12px; }
+            .screenshot-header { 
+                flex-direction: column; 
+                align-items: flex-start; 
+                position: relative; 
+                padding: 12px; 
+                gap: 8px; 
+            }
+            .screenshot-header h3 { font-size: 14px; max-width: 85%; }
+            .screenshot-header-hint { font-size: 11px; padding: 4px 6px; }
+            .screenshot-close-btn { position: absolute; top: 12px; right: 12px; }
         }
 
         .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-secondary); }
-
-        /* 截图预览弹窗 */
-        .screenshot-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; padding: 20px; }
-        .screenshot-modal.show { opacity: 1; pointer-events: auto; }
-        .screenshot-content { background: white; border-radius: 12px; width: 100%; max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
-        .screenshot-header { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
-        .screenshot-header h3 { font-size: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-        .screenshot-header-hint { font-size: 13px; color: #27ae60; font-weight: 600; background: rgba(39, 174, 96, 0.1); padding: 6px 12px; border-radius: 6px; }
-        .screenshot-close-btn { background: var(--bg-tertiary); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-        .screenshot-body { flex: 1; overflow: auto; padding: 24px; background: #f1f3f5; display: flex; justify-content: center; }
-        .screenshot-body img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        
     </style>
 </head>
 <body>
+    <!-- 数据加载过程中的全屏动画遮罩，解决白屏焦虑 -->
+    <div id="app-loader">
+        <div class="loader-spinner"></div>
+        <h2 style="font-size: 18px; color: #2c3e50; margin-bottom: 8px; font-weight: 600;">数据加载中...</h2>
+        <p style="font-size: 13px; color: #7f8c8d;">正在初始化就业分析模型</p>
+    </div>
+
     <!-- 容器本身就是防盗核心 -->
     <div class="container" id="mainAppContainer">
         <aside class="sidebar">
@@ -391,7 +423,7 @@
     <div class="screenshot-modal" id="screenshotModal">
         <div class="screenshot-content">
             <div class="screenshot-header">
-                <h3>📸 截图已生成并触发下载</h3>
+                <h3>📸 截图已生成</h3>
                 <span class="screenshot-header-hint" id="screenshotHint">✅ 若未自动下载，请右键图片 -> 另存为</span>
                 <button class="screenshot-close-btn" id="closeModalBtn">×</button>
             </div>
@@ -400,7 +432,8 @@
     </div>
 
     <script id="core-app-logic">
-        (function() {
+        // 将整个初始化逻辑绑定到 load 事件，确保 D3 异步加载完毕后执行
+        window.addEventListener('load', function() {
             // 核心数据
             const rawPackedData = [
                 "1|软件开发者|1876000|8.5|120990|bachelor|技术", "2|数据分析师|856000|8.2|78680|bachelor|技术", "3|市场分析师|736000|7.8|65680|bachelor|商业",
@@ -541,6 +574,17 @@
                 renderExposureBars();
                 renderVisualization();
                 setupEventListeners();
+
+                // 🌟 数据加载完毕后，淡出移除等待遮罩
+                const loader = document.getElementById('app-loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => {
+                        if (loader.parentNode) {
+                            loader.parentNode.removeChild(loader);
+                        }
+                    }, 400); // 等待过渡动画完成
+                }
             }
 
             function renderSidebarCategories() {
@@ -626,11 +670,12 @@
                 
                 const titles = { 'grid': '美国职业AI冲击度分布', 'list': '美国职业AI冲击度列表', 'treemap': '美国职业树地图', 'proportion': '美国各行业职业比例', 'trend': '美国24~25年度AI冲击趋势' };
                 
+                // 🌟 更新严格要求使用 ebaobao-logo.png
                 document.getElementById('chartTitle').innerHTML = `
                     <span>${titles[state.currentView]}${countText}</span>
                     <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:8px; display:inline-flex; align-items:center; text-decoration:none;">
-                        <img src="ebaogao-logo.png" alt="ebaogao" style="height:26px; vertical-align:middle; object-fit:contain;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                        <svg style="display:none; height:26px; vertical-align:middle;" viewBox="0 0 110 24" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="2" width="20" height="20" rx="4" fill="#3498db"/><rect x="4" y="12" width="3" height="6" rx="1" fill="#ffffff"/><rect x="8.5" y="8" width="3" height="10" rx="1" fill="#ffffff"/><rect x="13" y="14" width="3" height="4" rx="1" fill="#ffffff"/><text x="26" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#2c3e50">ebaogao</text><text x="86" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#3498db">.cn</text></svg>
+                        <img src="ebaobao-logo.png" alt="ebaobao" style="height:26px; vertical-align:middle; object-fit:contain;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                        <svg style="display:none; height:26px; vertical-align:middle;" viewBox="0 0 110 24" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="2" width="20" height="20" rx="4" fill="#3498db"/><rect x="4" y="12" width="3" height="6" rx="1" fill="#ffffff"/><rect x="8.5" y="8" width="3" height="10" rx="1" fill="#ffffff"/><rect x="13" y="14" width="3" height="4" rx="1" fill="#ffffff"/><text x="26" y="17" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#2c3e50">ebaobao</text></svg>
                     </a>`;
                 
                 const sortControls = document.getElementById('sortControls');
@@ -878,7 +923,7 @@
                         document.getElementById('screenshotHint').innerText = hintText;
 
                         const imgContainer = document.getElementById('screenshotImageContainer');
-                        imgContainer.innerHTML = `<img src="${imgDataUrl}" alt="分析报告截图" />`;
+                        imgContainer.innerHTML = `<img src="${imgDataUrl}" alt="分析报告截图" style="max-width: 100%; height: auto; border-radius: 8px;" />`;
                         document.getElementById('screenshotModal').classList.add('show');
 
                     }).catch(err => {
@@ -888,9 +933,7 @@
                     });
                 });
             }
-
-            init();
-        })();
+        });
     </script>
 </body>
 </html>
