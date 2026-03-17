@@ -3,10 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Occupational Exposure - US Labor Market</title>
+    
+    <!-- SEO Optimization -->
+    <title>AI Exposure of the US Job Market | Occupational Impact Analysis 2025</title>
+    <meta name="description" content="Explore interactive visualizations of AI exposure across the US labor market. Analyze 340+ occupations, employment trends, and wage impacts based on the latest AI Exposure of the US Job Market data.">
+    <meta name="keywords" content="AI Exposure of the US Job Market, AI job impact, automation risk analysis, US labor market trends, occupational exposure score, future of work">
+    <meta name="author" content="ebaogao.cn">
+    
+    <!-- Open Graph for Social Sharing -->
+    <meta property="og:title" content="AI Exposure of the US Job Market Analysis">
+    <meta property="og:description" content="How exposed is your job to AI? View the comprehensive analysis of the US labor market.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.ebaogao.cn">
+    
     <!-- Async load D3.js and html2canvas -->
     <script src="https://d3js.org/d3.v7.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -65,7 +78,7 @@
         .search-section { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; position: relative; z-index: 1000; }
         .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--bg-tertiary); border-radius: 8px; font-size: 14px; outline: none; transition: all var(--transition-speed); font-family: inherit; }
         .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); }
-        .search-dropdown { position: absolute; top: 100%; left: 24px; right: 24px; background: white; border: 1px solid var(--bg-tertiary); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; z-index: 1001; }
+        .search-dropdown { position: absolute; top: 100%; left: 24px; right: 24px; background: white; border: 1px solid var(--bg-tertiary); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24 rgba(0,0,0,0.15); display: none; z-index: 1001; }
         .search-dropdown.show { display: block; }
         .search-dropdown-item { padding: 12px 14px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--bg-secondary); }
         .search-dropdown-item:hover { background: var(--bg-secondary); }
@@ -173,6 +186,9 @@
         .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
         .bar-value { width: 40px; font-size: 9px; color: var(--text-primary); text-align: right; font-weight: 700; flex-shrink: 0; }
 
+        /* Footer */
+        .app-footer { padding: 30px 24px; text-align: center; font-size: 12px; color: var(--text-muted); background: var(--bg-secondary); border-top: 1px solid var(--bg-tertiary); letter-spacing: 0.5px; }
+
         /* Tooltip */
         .tooltip { position: fixed; background: var(--text-primary); color: white; padding: 14px 18px; border-radius: 8px; font-size: 12px; pointer-events: none; z-index: 2000; opacity: 0; transition: opacity 0.15s; max-width: 280px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
         .tooltip.visible { opacity: 1; }
@@ -217,7 +233,7 @@
     <div class="container" id="mainAppContainer">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>AI Occupational Exposure</h1>
+                <h1>AI Exposure of the US Job Market</h1>
                 <p>Analysis by <a href="https://www.ebaogao.cn" target="_blank">ebaogao.cn</a> | Data: <a href="https://www.bls.gov/ooh/" target="_blank">US BLS</a></p>
                 <p>Score by Gemini | Flash: <a href="https://github.com/karpathy/jobs" target="_blank">Karpathy</a></p>
             </div>
@@ -288,7 +304,7 @@
                 <button class="view-tab" data-view="trend">Shift Analysis</button>
             </div>
             
-            <div id="exportContainer" style="background: var(--bg-primary); padding-bottom: 40px;">
+            <div id="exportContainer" style="background: var(--bg-primary);">
                 <div class="chart-container">
                     <div class="chart-header-wrapper">
                         <div class="chart-title" id="chartTitle">Loading...</div>
@@ -326,6 +342,10 @@
                         <div id="exposureByEducation"></div>
                     </div>
                 </div>
+
+                <footer class="app-footer">
+                    Copyright &copy; <span id="currentYear"></span> ebaogao.cn. All Rights Reserved.
+                </footer>
             </div>
         </main>
     </div>
@@ -377,7 +397,7 @@
                 "58|Pharmacy Technicians|415000|6.5|35940|some-college|Healthcare", "59|Project Managers|2235000|6.5|95120|bachelor|Management", "60|Operations Managers|2150000|6.2|98620|bachelor|Management",
                 "61|CEOs|218300|5.5|213480|bachelor|Management", "62|HR Managers|189500|6.8|126180|bachelor|Management", "63|Finance Managers|737000|6.5|156180|bachelor|Management",
                 "64|Marketing Managers|385000|6.8|140320|bachelor|Management", "65|Sales Managers|2085000|5.8|132290|bachelor|Sales", "66|Insurance Agents|408000|6.2|72980|high|Finance",
-                "67|Real Estate Agents|223420|5.5|52380|some-college|Finance", "68|Bank Tellers|435000|6.8|35120|high|Finance", "69|Loan Officers|275000|7.2|64280|some-college|Finance",
+                "67|Real Estate Agents|223420|5.5|52380|some-college|Finance", "68|Bank Tellers|43500|6.8|35120|high|Finance", "69|Loan Officers|275000|7.2|64280|some-college|Finance",
                 "70|Investment Analysts|108000|8.5|92480|bachelor|Finance", "71|Personal Financial Advisors|218000|7.5|94820|bachelor|Finance", "72|Stock Traders|45000|8.2|102660|bachelor|Finance",
                 "73|Risk Analysts|102000|7.8|102680|bachelor|Finance", "74|Actuaries|28000|7.2|111030|bachelor|Finance", "75|Procurement Clerks|578000|6.2|62420|bachelor|Business",
                 "76|Logistics Coordinators|1945000|5.5|45280|some-college|Logistics", "77|Supply Chain Analysts|136000|7.2|76280|bachelor|Business", "78|Wh Managers|156000|5.2|56280|some-college|Logistics",
@@ -408,7 +428,7 @@
                 "151|SEO Specialists|85000|7.5|58220|some-college|Technology", "152|E-commerce Ops|285000|7.2|55220|bachelor|Business", "153|Purchasing Mgrs|218000|6.2|125220|bachelor|Business",
                 "154|Store Managers|2150000|4.5|45220|high|Sales", "155|Regional Managers|385000|5.8|85220|bachelor|Sales", "156|Telemarketers|1250000|6.5|32220|high|Sales",
                 "157|Technical Support|685000|6.8|52220|some-college|Technology", "158|Customer Success Mgrs|285000|6.2|65220|bachelor|Service", "159|Plant Managers|285000|5.2|105220|bachelor|Manufacturing",
-                "160|Prod Supervisors|685000|4.5|58220|some-college|Manufacturing", "161|Facility Managers|185000|5.2|98220|bachelor|Business", "162|Property Managers|215000|4.8|58220|some-college|Business",
+                "160|Prod Supervisors|685000|4.5|58220|some-college|Manufacturing", "161|Facility Managers|185000|5.2|98220|bachelor|Business", "162|Property Managers|21500|4.8|58220|some-college|Business",
                 "163|Auditors|185000|7.5|78220|bachelor|Finance", "164|Tax Specialists|215000|7.2|68220|bachelor|Finance", "165|Cashiers|685000|5.5|35220|high|Finance",
                 "166|HR Analysts|685000|6.8|62220|bachelor|Business", "167|Training Specialists|285000|6.2|58220|bachelor|Business", "168|Recruiters|385000|6.5|62220|bachelor|Business",
                 "169|Compliance Lawyers|85000|7.2|135220|professional|Legal", "170|IP Lawyers|45000|7.5|168220|professional|Legal", "171|Architects|128000|6.2|82220|bachelor|Design",
@@ -482,6 +502,10 @@
             const searchDropdown = document.getElementById('searchDropdown');
 
             function init() {
+                // Set automatic year
+                const yearSpan = document.getElementById('currentYear');
+                if (yearSpan) yearSpan.textContent = new Date().getFullYear();
+
                 renderSidebarCategories(); 
                 renderExposureBars();
                 renderVisualization();
@@ -575,7 +599,7 @@
                     <span style="flex:1">${titles[state.currentView]} (${filtered.length} Occupations)</span>
                     <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:12px; display:inline-flex; align-items:center; opacity:0.9; transition:opacity 0.2s">
                         <img src="ebaobao-logo.png" style="height:32px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                        <span style="display:none; color:var(--accent); font-weight:900; font-size:16px; letter-spacing:-0.5px">ebaobao.cn</span>
+                        <span style="display:none; color:var(--accent); font-weight:900; font-size:16px; letter-spacing:-0.5px">ebaobao</span>
                     </a>`;
 
                 document.getElementById('sortControls').style.display = (['grid', 'list'].includes(state.currentView)) ? 'flex' : 'none';
