@@ -25,27 +25,20 @@
             font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
             background: var(--bg-primary); color: var(--text-primary);
             line-height: 1.6; height: 100vh; overflow: hidden;
-            /* 基础防线：禁止用户选中页面文本防复制 */
-            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
         }
 
         .container { display: flex; height: 100vh; transition: opacity 0.2s; }
 
-        /* 安全护盾样式 */
-        #security-shield {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f8f9fa; z-index: 999999; text-align: center; padding-top: 20vh;
-            flex-direction: column; align-items: center;
-        }
-        #security-shield h2 { color: #e74c3c; font-size: 28px; margin-bottom: 16px; }
-        #security-shield p { color: var(--text-secondary); font-size: 16px; margin-bottom: 8px; }
-
         /* 侧边栏 */
         .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--bg-tertiary); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
         .sidebar-scroll { overflow-y: auto; flex: 1; height: 0; }
-        .sidebar-scroll::-webkit-scrollbar { width: 6px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 3px; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+        
+        /* 强化滚动条显示，使其更加醒目 */
+        .sidebar-scroll::-webkit-scrollbar, .sidebar::-webkit-scrollbar { width: 8px; }
+        .sidebar-scroll::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 4px; border: 1px solid var(--bg-secondary); }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover, .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.45); }
+        
         .sidebar-header { padding: 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-primary); flex-shrink: 0; }
         .sidebar-header h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
         .sidebar-header p { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
@@ -60,7 +53,7 @@
 
         /* 搜索与筛选 */
         .search-section { padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); flex-shrink: 0; position: relative; z-index: 100; }
-        .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--bg-tertiary); border-radius: 8px; font-size: 14px; outline: none; transition: all var(--transition-speed); font-family: inherit; -webkit-user-select: auto; user-select: auto; }
+        .search-input { width: 100%; padding: 12px 14px; border: 1px solid var(--bg-tertiary); border-radius: 8px; font-size: 14px; outline: none; transition: all var(--transition-speed); font-family: inherit; }
         .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); }
         .search-dropdown { position: absolute; top: 100%; left: 24px; right: 24px; background: white; border: 1px solid var(--bg-tertiary); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; z-index: 1000; }
         .search-dropdown.show { display: block; }
@@ -100,7 +93,6 @@
         .share-controls { display: flex; gap: 8px; margin-left: 8px; border-left: 1px solid var(--bg-tertiary); padding-left: 12px; }
         .legend { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--bg-primary); border: 1px solid var(--bg-tertiary); border-radius: 20px; }
         .legend-label { font-size: 11px; color: var(--text-secondary); }
-        /* 缩短色条长度，适应一行显示 */
         .legend-gradient { width: 100px; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--exposure-0), var(--exposure-2), var(--exposure-5), var(--exposure-7), var(--exposure-10)); }
 
         .category-sidebar-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 24px; border-bottom: 1px solid var(--bg-tertiary); background: var(--bg-secondary); }
@@ -134,6 +126,7 @@
         .list-item-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
         .list-item-meta { font-size: 12px; color: var(--text-secondary); }
         .list-item-stats { display: flex; gap: 20px; flex-shrink: 0; }
+        .list-item-stat { display: block; }
         .list-item-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
         .list-item-stat-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
@@ -186,46 +179,55 @@
             /* 1. 侧边栏整体合并滚动优化 */
             .sidebar { 
                 width: 100%; 
-                max-height: 55vh; /* 限制最高高度，保证留出空间看图表 */
+                max-height: 55vh; 
                 flex-shrink: 0; 
                 border-right: none; 
                 border-bottom: 1px solid var(--bg-tertiary); 
-                display: block; /* 取消flex防止挤压 */
-                overflow-y: auto; /* 让标题、数据、筛选区合并在一起滚动 */
+                display: block; 
+                overflow-y: auto; 
                 -webkit-overflow-scrolling: touch;
             }
             .sidebar-scroll { 
                 height: auto; 
-                overflow: visible; /* 关闭内部次级滚动条 */
+                overflow: visible; 
                 flex: none; 
             }
             
             .main-content { overflow-y: visible; flex: none; }
             .charts-grid { grid-template-columns: 1fr; }
             .header-controls-group { flex-direction: column; align-items: flex-start; gap: 8px; }
-            .grid-viz { grid-template-columns: repeat(2, 1fr); }
             
-            /* 2. 视图标签栏自动换行（双行）优化 */
+            /* 解决微信端网格视图拥挤问题：调小间距和内边距，确保完美显示两列 */
+            .grid-viz { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px; }
+            .grid-item { padding: 10px; }
+            
+            /* 优化列表视图：让右侧数据上下排列，指标和数据一行显示 */
+            .list-item { padding: 12px; gap: 10px; }
+            .list-item-stats { flex-direction: column; gap: 6px; align-items: flex-end; }
+            .list-item-stat { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+            .list-item-stat-label { margin-bottom: 0; }
+            
+            /* 视图标签栏自动换行（双行）优化 */
             .view-tabs { 
                 flex-wrap: wrap; 
                 gap: 8px; 
                 padding: 12px 16px;
-                overflow-x: visible; /* 取消横向滚动 */
+                overflow-x: visible;
             }
             .view-tab { 
-                flex: 1 1 calc(50% - 8px); /* 自动变成每排2个 */
+                flex: 1 1 calc(50% - 8px);
                 text-align: center; 
                 padding: 8px 10px; 
                 font-size: 13px;
                 white-space: normal;
             }
 
-            /* 3. 为图表的 X 轴数据条腾出空间 */
-            .proportion-label { width: 85px; font-size: 11px; } /* 缩小文字占用的横向空间 */
+            /* 为图表的 X 轴数据条腾出空间 */
+            .proportion-label { width: 85px; font-size: 11px; }
             .trend-label { width: 85px; font-size: 11px; }
             .proportion-value { width: 45px; font-size: 11px; }
             .trend-value { width: 45px; font-size: 11px; }
-            .proportion-viz, .trend-viz { padding: 12px 10px; } /* 减小内边距 */
+            .proportion-viz, .trend-viz { padding: 12px 10px; }
             
             /* 手机端进一步缩短色条，让出按钮空间 */
             .legend-gradient { width: 60px; }
@@ -249,14 +251,6 @@
     </style>
 </head>
 <body>
-    <!-- 安全护盾：在用户点击“另存为”导致页面失焦时，瞬间覆盖整个页面 -->
-    <div id="security-shield">
-        <h2>🔒 安全保护模式已激活</h2>
-        <p>检测到页面环境变化或尝试保存行为。</p>
-        <p>为保护数据版权，核心内容已自动隐藏并从内存中擦除。</p>
-        <p style="margin-top: 20px; font-size: 13px;">（点击页面任意处恢复显示）</p>
-    </div>
-
     <!-- 容器本身就是防盗核心 -->
     <div class="container" id="mainAppContainer">
         <aside class="sidebar">
@@ -405,28 +399,9 @@
         </div>
     </div>
 
-    <!-- 终极防护脚本 -->
     <script id="core-app-logic">
         (function() {
-            // ==========================================
-            // 杀手锏 0: 终极防御 - 禁止本地文件协议运行 (防 "网页另存为")
-            // ==========================================
-            // 如果用户将网页保存到了本地双击打开 (file:///)，直接自毁全部内容
-            if (window.location.protocol === 'file:') {
-                document.documentElement.innerHTML = `
-                    <body style="background:#f8f9fa;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;margin:0;">
-                        <div style="text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.1);">
-                            <h2 style="color:#e74c3c;margin-bottom:16px;">⚠️ 安全警告：禁止本地运行</h2>
-                            <p style="color:#6c757d;">为保护数据及代码版权，该报告禁止以“网页另存为”形式在本地运行查看。</p>
-                        </div>
-                    </body>`;
-                return; // 立即终止脚本，数据无法解密渲染
-            }
-
-            const scriptTag = document.getElementById('core-app-logic');
-            if (scriptTag) scriptTag.remove();
-
-            // 核心数据隐藏在闭包中
+            // 核心数据
             const rawPackedData = [
                 "1|软件开发者|1876000|8.5|120990|bachelor|技术", "2|数据分析师|856000|8.2|78680|bachelor|技术", "3|市场分析师|736000|7.8|65680|bachelor|商业",
                 "4|簿记员|1605000|7.5|42130|some-college|财务", "5|客户服务代表|2855000|6.8|37060|high|服务", "6|零售店员|4350000|5.2|29840|high|销售",
@@ -553,7 +528,6 @@
                     education: parts[5], category: parts[6]
                 };
             });
-            // 立马清空原数组，不留痕迹
             rawPackedData.length = 0; 
 
             // UI 状态
@@ -562,69 +536,7 @@
             const vizContainer = document.getElementById('vizContainer');
             const searchDropdown = document.getElementById('searchDropdown');
 
-            // 杀手锏 2 & 3: 终极防御系统设置
-            function setupProtections() {
-                // 🌟 修改点：禁用右键，但【为截图弹窗开辟特权】，让PC端可以在截图上右键另存！
-                document.addEventListener('contextmenu', e => {
-                    // 如果右键点击的不是截图弹窗里面的内容，就拦截掉
-                    if (!e.target.closest('#screenshotModal')) {
-                        e.preventDefault();
-                    }
-                });
-
-                // 拦截快捷键
-                document.addEventListener('keydown', e => {
-                    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'u' || e.key.toLowerCase() === 'p')) {
-                        e.preventDefault();
-                    }
-                    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase()))) {
-                        e.preventDefault();
-                    }
-                });
-
-                // ==========================================
-                // 杀手锏 3: 离屏 DOM 物理拔除技术 (针对“另存为”)
-                // ==========================================
-                let appNode = null;
-                const shield = document.getElementById('security-shield');
-                const container = document.getElementById('mainAppContainer');
-                
-                function activateShield() {
-                    // 如果是我们自己主动触发的下载，跳过防盗保护
-                    if (window.__isDownloading) return; 
-                    if (container && container.parentNode) {
-                        appNode = container;
-                        // 从网页骨架里物理删除它！此时按保存，只能存下来空白骨架！
-                        container.remove(); 
-                    }
-                    shield.style.display = 'flex';
-                }
-
-                function deactivateShield() {
-                    if (appNode) {
-                        // 重新插回到页面中，无缝恢复使用
-                        document.body.insertBefore(appNode, document.getElementById('security-shield'));
-                        appNode = null;
-                    }
-                    shield.style.display = 'none';
-                }
-
-                window.addEventListener('blur', activateShield);
-                window.addEventListener('focus', deactivateShield);
-
-                // 🌟 新增：鼠标越界秒杀机制
-                // 浏览器“另存为”操作前，用户鼠标必须移向地址栏或菜单栏
-                // 只要鼠标一离开网页显示区域，立刻拔除DOM！根本不给你点击菜单的机会
-                document.addEventListener('mouseleave', (e) => {
-                    if (e.clientY <= 0 || e.clientX <= 0 || (e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
-                        activateShield();
-                    }
-                });
-                document.addEventListener('mouseenter', deactivateShield);
-            }
-
             function init() {
-                setupProtections();
                 renderSidebarCategories(); 
                 renderExposureBars();
                 renderVisualization();
@@ -714,7 +626,6 @@
                 
                 const titles = { 'grid': '美国职业AI冲击度分布', 'list': '美国职业AI冲击度列表', 'treemap': '美国职业树地图', 'proportion': '美国各行业职业比例', 'trend': '美国24~25年度AI冲击趋势' };
                 
-                // 🌟 修正了这里的拼写错误，从 ebaobao 修正为真实的 ebaogao-logo.png
                 document.getElementById('chartTitle').innerHTML = `
                     <span>${titles[state.currentView]}${countText}</span>
                     <a href="https://www.ebaogao.cn" target="_blank" style="margin-left:8px; display:inline-flex; align-items:center; text-decoration:none;">
@@ -911,14 +822,12 @@
                     document.getElementById('screenshotImageContainer').innerHTML = '';
                 });
 
-                // 🌟 新增：分享链接交互功能
                 document.getElementById('shareLinkBtn').addEventListener('click', () => {
                     const url = window.location.href;
                     const textSpan = document.getElementById('shareLinkText');
                     const originalText = textSpan.innerText;
                     textSpan.innerText = "⏳ 复制中...";
                     
-                    // 创建临时输入框拷贝
                     const input = document.createElement('input');
                     input.value = url;
                     document.body.appendChild(input);
@@ -933,22 +842,14 @@
                     setTimeout(() => { textSpan.innerText = originalText; }, 2000);
                 });
 
-                // ==========================================
-                // 彻底修复稳定版的截图逻辑
-                // ==========================================
                 document.getElementById('shareScreenshotBtn').addEventListener('click', () => {
-                    // 开启下载锁，防止被底层的“失焦保护”误杀
-                    window.__isDownloading = true; 
-                    
                     const container = document.getElementById('exportContainer');
                     const btnTextSpan = document.getElementById('shareBtnText');
-                    
                     const originalText = btnTextSpan.innerText;
                     btnTextSpan.innerText = "⏳ 正在生成...";
                     
                     window.scrollTo(0, 0);
 
-                    // 🌟 使用 onclone 安全隐藏按钮，不破坏原有 DOM 导致闪烁
                     html2canvas(container, {
                         scale: 2, 
                         backgroundColor: '#ffffff',
@@ -959,10 +860,8 @@
                         }
                     }).then(canvas => {
                         btnTextSpan.innerText = originalText;
-
                         const imgDataUrl = canvas.toDataURL('image/png');
 
-                        // 尝试直接下载
                         try {
                             const link = document.createElement('a');
                             link.download = `美国职业AI冲击度分析_${new Date().getTime()}.png`;
@@ -974,31 +873,22 @@
                             console.warn('直接下载可能被拦截', e);
                         }
 
-                        // 🌟 动态判断设备，改变提示文案
                         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                         const hintText = isMobile ? '✅ 请长按图片，转发或者保存' : '✅ 若未自动下载，请右键图片 -> 另存为';
                         document.getElementById('screenshotHint').innerText = hintText;
 
-                        // 弹窗预览双保险
                         const imgContainer = document.getElementById('screenshotImageContainer');
                         imgContainer.innerHTML = `<img src="${imgDataUrl}" alt="分析报告截图" />`;
                         document.getElementById('screenshotModal').classList.add('show');
 
-                        // 延迟解除锁
-                        setTimeout(() => { window.__isDownloading = false; }, 1500);
-
                     }).catch(err => {
                         console.error('截图引擎发生错误', err);
                         btnTextSpan.innerText = '❌ 生成失败';
-                        setTimeout(() => { 
-                            btnTextSpan.innerText = originalText; 
-                            window.__isDownloading = false; 
-                        }, 2000);
+                        setTimeout(() => { btnTextSpan.innerText = originalText; }, 2000);
                     });
                 });
             }
 
-            // 启动应用
             init();
         })();
     </script>
